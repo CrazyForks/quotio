@@ -354,12 +354,13 @@ final class CLIProxyManager {
         environment["TERM"] = "xterm-256color"
         process.environment = environment
         
-        process.terminationHandler = { [weak self] terminatedProcess in
-            Task { @MainActor in
+        process.terminationHandler = { terminatedProcess in
+            let status = terminatedProcess.terminationStatus
+            Task { @MainActor [weak self] in
                 self?.proxyStatus.running = false
                 self?.process = nil
-                if terminatedProcess.terminationStatus != 0 {
-                    self?.lastError = "Process exited with code: \(terminatedProcess.terminationStatus)"
+                if status != 0 {
+                    self?.lastError = "Process exited with code: \(status)"
                 }
             }
         }

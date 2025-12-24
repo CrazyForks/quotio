@@ -4,11 +4,13 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ProvidersScreen: View {
     @Environment(QuotaViewModel.self) private var viewModel
+    @State private var isImporterPresented = false
     @State private var selectedProvider: AIProvider?
-    @State private var projectId = ""
+    @State private var projectId: String = ""
     
     var body: some View {
         List {
@@ -28,14 +30,16 @@ struct ProvidersScreen: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(viewModel.authFiles, id: \.id) { file in
-                            AuthFileRow(file: file)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        Task { await viewModel.deleteAuthFile(file) }
-                                    } label: {
-                                        Label("action.delete".localized(), systemImage: "trash")
-                                    }
+                            AuthFileRow(file: file) {
+                                Task { await viewModel.deleteAuthFile(file) }
+                            }
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await viewModel.deleteAuthFile(file) }
+                                } label: {
+                                    Label("action.delete".localized(), systemImage: "trash")
                                 }
+                            }
                         }
                     }
                 } header: {
@@ -46,7 +50,11 @@ struct ProvidersScreen: View {
                 Section {
                     ForEach(AIProvider.allCases) { provider in
                         Button {
-                            selectedProvider = provider
+                            if provider == .vertex {
+                                isImporterPresented = true
+                            } else {
+                                selectedProvider = provider
+                            }
                         } label: {
                             HStack {
                                 ProviderIcon(provider: provider, size: 24)
@@ -84,6 +92,22 @@ struct ProvidersScreen: View {
             }
             .environment(viewModel)
         }
+        .fileImporter(
+            isPresented: $isImporterPresented,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    Task {
+                        await viewModel.importVertexServiceAccount(url: url)
+                    }
+                }
+            case .failure(let error):
+                print("Import failed: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
@@ -91,6 +115,7 @@ struct ProvidersScreen: View {
 
 struct AuthFileRow: View {
     let file: AuthFile
+    let onDelete: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -127,6 +152,15 @@ struct AuthFileRow: View {
                     .background(.secondary.opacity(0.2))
                     .clipShape(Capsule())
             }
+            
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.borderless)
+            .help("action.delete".localized())
         }
     }
 }

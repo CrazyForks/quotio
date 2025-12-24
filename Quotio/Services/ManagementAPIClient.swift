@@ -132,11 +132,15 @@ actor ManagementAPIClient {
     func uploadVertexServiceAccount(jsonPath: String) async throws {
         let url = URL(fileURLWithPath: jsonPath)
         let fileData = try Data(contentsOf: url)
-        _ = try await makeRequest("/vertex/import", method: "POST", body: fileData)
+        try await uploadVertexServiceAccount(data: fileData)
+    }
+
+    func uploadVertexServiceAccount(data: Data) async throws {
+        _ = try await makeRequest("/vertex/import", method: "POST", body: data)
     }
 }
 
-struct LogsResponse: Codable {
+struct LogsResponse: Codable, Sendable {
     let lines: [String]?
     let lineCount: Int?
     let latestTimestamp: Int?

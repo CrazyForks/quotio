@@ -7,7 +7,7 @@ import Foundation
 
 // MARK: - Models
 
-struct ModelQuota: Codable, Identifiable {
+struct ModelQuota: Codable, Identifiable, Sendable {
     let name: String
     let percentage: Int
     let resetTime: String
@@ -62,7 +62,7 @@ struct ModelQuota: Codable, Identifiable {
     }
 }
 
-struct ProviderQuotaData: Codable {
+struct ProviderQuotaData: Codable, Sendable {
     var models: [ModelQuota]
     var lastUpdated: Date
     var isForbidden: Bool
@@ -76,7 +76,7 @@ struct ProviderQuotaData: Codable {
 
 // MARK: - Subscription Info Models
 
-struct SubscriptionTier: Codable {
+struct SubscriptionTier: Codable, Sendable {
     let id: String
     let name: String
     let description: String
@@ -88,12 +88,12 @@ struct SubscriptionTier: Codable {
     let userDefinedCloudaicompanionProject: Bool?
 }
 
-struct PrivacyNotice: Codable {
+struct PrivacyNotice: Codable, Sendable {
     let showNotice: Bool?
     let noticeText: String?
 }
 
-struct SubscriptionInfo: Codable {
+struct SubscriptionInfo: Codable, Sendable {
     let currentTier: SubscriptionTier?
     let allowedTiers: [SubscriptionTier]?
     let cloudaicompanionProject: String?
@@ -130,20 +130,20 @@ struct SubscriptionInfo: Codable {
 
 // MARK: - API Response Models
 
-private struct QuotaAPIResponse: Codable {
+private struct QuotaAPIResponse: Codable, Sendable {
     let models: [String: ModelInfo]
 }
 
-private struct ModelInfo: Codable {
+private struct ModelInfo: Codable, Sendable {
     let quotaInfo: QuotaInfo?
 }
 
-private struct QuotaInfo: Codable {
+private struct QuotaInfo: Codable, Sendable {
     let remainingFraction: Double?
     let resetTime: String?
 }
 
-private struct TokenRefreshResponse: Codable {
+private struct TokenRefreshResponse: Codable, Sendable {
     let accessToken: String
     let expiresIn: Int
     let tokenType: String?
@@ -157,7 +157,7 @@ private struct TokenRefreshResponse: Codable {
 
 // MARK: - Auth File Model
 
-struct AntigravityAuthFile: Codable {
+struct AntigravityAuthFile: Codable, Sendable {
     var accessToken: String
     let email: String
     let expired: String?

@@ -234,6 +234,30 @@ final class QuotaViewModel {
             errorMessage = error.localizedDescription
         }
     }
+
+    func importVertexServiceAccount(url: URL) async {
+        guard let client = apiClient else {
+            errorMessage = "Proxy not running"
+            return
+        }
+        
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            guard url.startAccessingSecurityScopedResource() else {
+                throw NSError(domain: "Quotio", code: 403, userInfo: [NSLocalizedDescriptionKey: "Permission denied"])
+            }
+            let data = try Data(contentsOf: url)
+            url.stopAccessingSecurityScopedResource()
+            
+            try await client.uploadVertexServiceAccount(data: data)
+            await refreshData()
+            errorMessage = nil
+        } catch {
+            errorMessage = "Import failed: \(error.localizedDescription)"
+        }
+    }
     
     func clearLogs() async {
         guard let client = apiClient else { return }

@@ -183,6 +183,12 @@ struct LocalizedStrings {
         "oauth.closingSheet": [.english: "Closing...", .vietnamese: "Đang đóng..."],
         "oauth.failed": [.english: "Authentication failed", .vietnamese: "Xác thực thất bại"],
         "oauth.timeout": [.english: "Authentication timeout", .vietnamese: "Hết thời gian xác thực"],
+        
+        "import.vertexKey": [.english: "Import Service Account Key", .vietnamese: "Nhập khóa tài khoản dịch vụ"],
+        "import.vertexDesc": [.english: "Select the JSON key file for your Vertex AI service account", .vietnamese: "Chọn tệp khóa JSON cho tài khoản dịch vụ Vertex AI"],
+        "import.selectFile": [.english: "Select JSON File", .vietnamese: "Chọn tệp JSON"],
+        "import.success": [.english: "Key imported successfully", .vietnamese: "Đã nhập khóa thành công"],
+        "import.failed": [.english: "Import failed", .vietnamese: "Nhập thất bại"],
     ]
     
     static func get(_ key: String, language: AppLanguage) -> String {
@@ -192,7 +198,7 @@ struct LocalizedStrings {
 
 extension String {
     @MainActor
-    func localized(_ manager: LanguageManager = .shared) -> String {
-        return manager.localized(self)
+    func localized() -> String {
+        return LanguageManager.shared.localized(self)
     }
 }

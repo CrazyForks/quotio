@@ -94,7 +94,7 @@ struct ProxyStatus: Codable {
 
 // MARK: - Auth File (from Management API)
 
-struct AuthFile: Codable, Identifiable, Hashable {
+struct AuthFile: Codable, Identifiable, Hashable, Sendable {
     let id: String
     let name: String
     let provider: String
@@ -149,13 +149,13 @@ struct AuthFile: Codable, Identifiable, Hashable {
     }
 }
 
-struct AuthFilesResponse: Codable {
+struct AuthFilesResponse: Codable, Sendable {
     let files: [AuthFile]
 }
 
 // MARK: - Usage Statistics
 
-struct UsageStats: Codable {
+struct UsageStats: Codable, Sendable {
     let usage: UsageData?
     let failedRequests: Int?
     
@@ -165,7 +165,7 @@ struct UsageStats: Codable {
     }
 }
 
-struct UsageData: Codable {
+struct UsageData: Codable, Sendable {
     let totalRequests: Int?
     let successCount: Int?
     let failureCount: Int?
@@ -190,14 +190,14 @@ struct UsageData: Codable {
 
 // MARK: - OAuth Flow
 
-struct OAuthURLResponse: Codable {
+struct OAuthURLResponse: Codable, Sendable {
     let status: String
     let url: String?
     let state: String?
     let error: String?
 }
 
-struct OAuthStatusResponse: Codable {
+struct OAuthStatusResponse: Codable, Sendable {
     let status: String
     let error: String?
 }
