@@ -4,15 +4,22 @@
 //
 
 import SwiftUI
+import ServiceManagement
 
 @main
 struct QuotioApp: App {
     @State private var viewModel = QuotaViewModel()
+    @AppStorage("autoStartProxy") private var autoStartProxy = false
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(viewModel)
+                .task {
+                    if autoStartProxy && viewModel.proxyManager.isBinaryInstalled {
+                        await viewModel.startProxy()
+                    }
+                }
         }
         .defaultSize(width: 1000, height: 700)
         
@@ -69,12 +76,17 @@ struct ContentView: View {
             .navigationTitle("Quotio")
             .toolbar {
                 ToolbarItem {
-                    Button {
-                        Task { await viewModel.toggleProxy() }
-                    } label: {
-                        Image(systemName: viewModel.proxyManager.proxyStatus.running ? "stop.fill" : "play.fill")
+                    if viewModel.proxyManager.isStarting {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Button {
+                            Task { await viewModel.toggleProxy() }
+                        } label: {
+                            Image(systemName: viewModel.proxyManager.proxyStatus.running ? "stop.fill" : "play.fill")
+                        }
+                        .help(viewModel.proxyManager.proxyStatus.running ? "Stop Proxy" : "Start Proxy")
                     }
-                    .help(viewModel.proxyManager.proxyStatus.running ? "Stop Proxy" : "Start Proxy")
                 }
             }
         } detail: {

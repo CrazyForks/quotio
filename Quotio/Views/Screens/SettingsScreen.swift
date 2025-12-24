@@ -4,10 +4,12 @@
 //
 
 import SwiftUI
+import ServiceManagement
 
 struct SettingsScreen: View {
     @Environment(QuotaViewModel.self) private var viewModel
     
+    @AppStorage("autoStartProxy") private var autoStartProxy = false
     @AppStorage("routingStrategy") private var routingStrategy = "round-robin"
     @AppStorage("requestRetry") private var requestRetry = 3
     @AppStorage("switchProjectOnQuotaExceeded") private var switchProject = true
@@ -55,6 +57,8 @@ struct SettingsScreen: View {
                         .buttonStyle(.borderless)
                     }
                 }
+                
+                Toggle("Auto-start proxy on launch", isOn: $autoStartProxy)
             } header: {
                 Label("Proxy Server", systemImage: "server.rack")
             } footer: {
@@ -163,13 +167,36 @@ struct AppSettingsView: View {
 }
 
 struct GeneralSettingsTab: View {
-    @AppStorage("launchAtLogin") private var launchAtLogin = false
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @AppStorage("showInDock") private var showInDock = true
+    @AppStorage("autoStartProxy") private var autoStartProxy = false
     
     var body: some View {
         Form {
-            Toggle("Launch at login", isOn: $launchAtLogin)
-            Toggle("Show in Dock", isOn: $showInDock)
+            Section {
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in
+                        do {
+                            if newValue {
+                                try SMAppService.mainApp.register()
+                            } else {
+                                try SMAppService.mainApp.unregister()
+                            }
+                        } catch {
+                            launchAtLogin = !newValue
+                        }
+                    }
+                
+                Toggle("Auto-start proxy on launch", isOn: $autoStartProxy)
+            } header: {
+                Label("Startup", systemImage: "power")
+            }
+            
+            Section {
+                Toggle("Show in Dock", isOn: $showInDock)
+            } header: {
+                Label("Appearance", systemImage: "macwindow")
+            }
         }
         .formStyle(.grouped)
         .padding()
