@@ -19,6 +19,7 @@ final class QuotaViewModel {
     var authFiles: [AuthFile] = []
     var usageStats: UsageStats?
     var logs: [LogEntry] = []
+    var apiKeys: [String] = []
     var isLoading = false
     var isLoadingQuotas = false
     var errorMessage: String?
@@ -112,9 +113,11 @@ final class QuotaViewModel {
         do {
             async let files = client.fetchAuthFiles()
             async let stats = client.fetchUsageStats()
+            async let keys = client.fetchAPIKeys()
             
             self.authFiles = try await files
             self.usageStats = try await stats
+            self.apiKeys = try await keys
             
             let shouldRefreshQuotas = lastQuotaRefresh == nil || 
                 Date().timeIntervalSince(lastQuotaRefresh!) >= quotaRefreshInterval
@@ -307,6 +310,51 @@ final class QuotaViewModel {
             try await client.clearLogs()
             logs.removeAll()
             lastLogTimestamp = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func fetchAPIKeys() async {
+        guard let client = apiClient else { return }
+        
+        do {
+            apiKeys = try await client.fetchAPIKeys()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func addAPIKey(_ key: String) async {
+        guard let client = apiClient else { return }
+        guard !key.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        
+        do {
+            try await client.addAPIKey(key)
+            await fetchAPIKeys()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func updateAPIKey(old: String, new: String) async {
+        guard let client = apiClient else { return }
+        guard !new.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        
+        do {
+            try await client.updateAPIKey(old: old, new: new)
+            await fetchAPIKeys()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    func deleteAPIKey(_ key: String) async {
+        guard let client = apiClient else { return }
+        
+        do {
+            try await client.deleteAPIKey(value: key)
+            await fetchAPIKeys()
         } catch {
             errorMessage = error.localizedDescription
         }

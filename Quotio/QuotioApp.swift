@@ -82,6 +82,9 @@ struct ContentView: View {
                     Label("nav.providers".localized(), systemImage: "person.2.badge.key")
                         .tag(NavigationPage.providers)
                     
+                    Label("nav.apiKeys".localized(), systemImage: "key.horizontal")
+                        .tag(NavigationPage.apiKeys)
+                    
                     Label("nav.logs".localized(), systemImage: "doc.text")
                         .tag(NavigationPage.logs)
                     
@@ -132,6 +135,8 @@ struct ContentView: View {
                 QuotaScreen()
             case .providers:
                 ProvidersScreen()
+            case .apiKeys:
+                APIKeysScreen()
             case .logs:
                 LogsScreen()
             case .settings:

@@ -153,6 +153,16 @@ struct AuthFilesResponse: Codable, Sendable {
     let files: [AuthFile]
 }
 
+// MARK: - API Keys (Proxy Service Auth)
+
+struct APIKeysResponse: Codable, Sendable {
+    let apiKeys: [String]
+    
+    enum CodingKeys: String, CodingKey {
+        case apiKeys = "api-keys"
+    }
+}
+
 // MARK: - Usage Statistics
 
 struct UsageStats: Codable, Sendable {
@@ -287,6 +297,7 @@ enum NavigationPage: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case quota = "Quota"
     case providers = "Providers"
+    case apiKeys = "API Keys"
     case logs = "Logs"
     case settings = "Settings"
     
@@ -297,6 +308,7 @@ enum NavigationPage: String, CaseIterable, Identifiable {
         case .dashboard: return "gauge.with.dots.needle.33percent"
         case .quota: return "chart.bar.fill"
         case .providers: return "person.2.badge.key"
+        case .apiKeys: return "key.horizontal"
         case .logs: return "doc.text"
         case .settings: return "gearshape"
         }

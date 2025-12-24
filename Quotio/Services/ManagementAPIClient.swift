@@ -138,6 +138,38 @@ actor ManagementAPIClient {
     func uploadVertexServiceAccount(data: Data) async throws {
         _ = try await makeRequest("/vertex/import", method: "POST", body: data)
     }
+    
+    func fetchAPIKeys() async throws -> [String] {
+        let data = try await makeRequest("/api-keys")
+        let response = try JSONDecoder().decode(APIKeysResponse.self, from: data)
+        return response.apiKeys
+    }
+    
+    func addAPIKey(_ key: String) async throws {
+        let currentKeys = try await fetchAPIKeys()
+        var newKeys = currentKeys
+        newKeys.append(key)
+        try await replaceAPIKeys(newKeys)
+    }
+    
+    func replaceAPIKeys(_ keys: [String]) async throws {
+        let body = try JSONEncoder().encode(keys)
+        _ = try await makeRequest("/api-keys", method: "PUT", body: body)
+    }
+    
+    func updateAPIKey(old: String, new: String) async throws {
+        let body = try JSONEncoder().encode(["old": old, "new": new])
+        _ = try await makeRequest("/api-keys", method: "PATCH", body: body)
+    }
+    
+    func deleteAPIKey(value: String) async throws {
+        let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+        _ = try await makeRequest("/api-keys?value=\(encodedValue)", method: "DELETE")
+    }
+    
+    func deleteAPIKeyByIndex(_ index: Int) async throws {
+        _ = try await makeRequest("/api-keys?index=\(index)", method: "DELETE")
+    }
 }
 
 struct LogsResponse: Codable, Sendable {

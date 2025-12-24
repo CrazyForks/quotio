@@ -53,6 +53,7 @@ struct LocalizedStrings {
         "nav.dashboard": [.english: "Dashboard", .vietnamese: "Bảng điều khiển"],
         "nav.quota": [.english: "Quota", .vietnamese: "Hạn mức"],
         "nav.providers": [.english: "Providers", .vietnamese: "Nhà cung cấp"],
+        "nav.apiKeys": [.english: "API Keys", .vietnamese: "Khóa API"],
         "nav.logs": [.english: "Logs", .vietnamese: "Nhật ký"],
         "nav.settings": [.english: "Settings", .vietnamese: "Cài đặt"],
         
@@ -135,6 +136,23 @@ struct LocalizedStrings {
         "settings.launchAtLogin": [.english: "Launch at login", .vietnamese: "Khởi động cùng hệ thống"],
         "settings.showInDock": [.english: "Show in Dock", .vietnamese: "Hiển thị trên Dock"],
         "settings.restartForEffect": [.english: "Restart app for full effect", .vietnamese: "Khởi động lại ứng dụng để có hiệu lực đầy đủ"],
+        "settings.apiKeys": [.english: "API Keys", .vietnamese: "Khóa API"],
+        "settings.apiKeysHelp": [.english: "API keys for clients to authenticate with the proxy", .vietnamese: "Khóa API để các client xác thực với proxy"],
+        "settings.addAPIKey": [.english: "Add API Key", .vietnamese: "Thêm khóa API"],
+        "settings.apiKeyPlaceholder": [.english: "Enter API key...", .vietnamese: "Nhập khóa API..."],
+        
+        // API Keys Screen
+        "apiKeys.list": [.english: "API Keys", .vietnamese: "Danh sách khóa API"],
+        "apiKeys.description": [.english: "API keys for clients to authenticate with the proxy service", .vietnamese: "Khóa API để các client xác thực với dịch vụ proxy"],
+        "apiKeys.add": [.english: "Add Key", .vietnamese: "Thêm khóa"],
+        "apiKeys.addHelp": [.english: "Add a new API key", .vietnamese: "Thêm khóa API mới"],
+        "apiKeys.generate": [.english: "Generate", .vietnamese: "Tạo ngẫu nhiên"],
+        "apiKeys.generateHelp": [.english: "Generate a random API key", .vietnamese: "Tạo khóa API ngẫu nhiên"],
+        "apiKeys.generateFirst": [.english: "Generate Your First Key", .vietnamese: "Tạo khóa đầu tiên"],
+        "apiKeys.placeholder": [.english: "Enter API key...", .vietnamese: "Nhập khóa API..."],
+        "apiKeys.edit": [.english: "Edit", .vietnamese: "Sửa"],
+        "apiKeys.empty": [.english: "No API Keys", .vietnamese: "Chưa có khóa API"],
+        "apiKeys.emptyDescription": [.english: "Add API keys to authenticate clients with the proxy", .vietnamese: "Thêm khóa API để xác thực client với proxy"],
         
         // Logs
         "logs.clearLogs": [.english: "Clear Logs", .vietnamese: "Xóa nhật ký"],
