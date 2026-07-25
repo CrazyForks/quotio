@@ -158,7 +158,7 @@ struct AddFallbackEntrySheet: View {
         }
 
         // SECOND: Try to match by model ID prefix (fallback for unknown provider strings)
-        // e.g., "kiro-claude-xxx" -> kiro, "gemini-claude-xxx" -> gemini
+        // e.g., "kiro-claude-xxx" -> kiro, "gemini-claude-xxx" -> antigravity
         for provider in AIProvider.allCases {
             let providerKey = provider.rawValue.lowercased()
             if modelId.hasPrefix(providerKey + "-") || modelId.hasPrefix(providerKey + "_") {
@@ -170,7 +170,7 @@ struct AddFallbackEntrySheet: View {
         if modelId.contains("kiro") {
             return .kiro
         } else if modelId.contains("gemini") {
-            return .gemini
+            return .antigravity
         } else if modelId.contains("copilot") {
             return .copilot
         } else if modelId.contains("codex") {

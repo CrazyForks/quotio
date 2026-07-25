@@ -562,7 +562,7 @@ final class MenuBarSettingsManager {
               let items = try? JSONDecoder().decode([MenuBarQuotaItem].self, from: data) else {
             return []
         }
-        return items
+        return items.filter { $0.provider != "gemini-cli" }
     }
     
     func addItem(_ item: MenuBarQuotaItem) {
