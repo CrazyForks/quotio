@@ -1101,6 +1101,7 @@ private struct MenuAccountCardView: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
+                .menuNativeTooltip(model.tooltip ?? "")
             }
         }
     }
@@ -2537,6 +2538,7 @@ private extension AIProvider {
         case .devin: return "Devin"
         case .grok: return "Grok"
         case .openRouter: return "OpenRouter"
+        case .amp: return "Amp"
         case .glm: return "Z.ai"
         case .warp: return "Warp"
         case .clinePass: return "ClinePass"
