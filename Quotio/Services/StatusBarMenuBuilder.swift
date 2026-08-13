@@ -2145,7 +2145,15 @@ private func menuDisplayPercent(remainingPercent: Double, displayMode: QuotaDisp
     displayMode.displayValue(from: remainingPercent)
 }
 
+/// Formatted percentage for menu rows. A negative remaining percentage means
+/// "no data yet" and renders as a placeholder instead of a fake value like 101%.
+private func menuPercentText(remainingPercent: Double, displayMode: QuotaDisplayMode) -> String {
+    guard remainingPercent >= 0 else { return "—" }
+    return "\(Int(menuDisplayPercent(remainingPercent: remainingPercent, displayMode: displayMode)))%"
+}
+
 private func menuStatusColor(remainingPercent: Double, displayMode: QuotaDisplayMode) -> Color {
+    guard remainingPercent >= 0 else { return .secondary }
     let usedPercent = 100 - remainingPercent
     let checkValue = displayMode == .used ? usedPercent : remainingPercent
 
@@ -2230,7 +2238,7 @@ private struct LowestBarLayout: View {
                                     .font(.system(size: 9, design: .rounded))
                                     .foregroundStyle(.tertiary)
                             }
-                            Text("\(Int(menuDisplayPercent(remainingPercent: model.percentage, displayMode: displayMode)))%")
+                            Text(menuPercentText(remainingPercent: model.percentage, displayMode: displayMode))
                                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                                 .foregroundStyle(menuStatusColor(remainingPercent: model.percentage, displayMode: displayMode))
                         }
@@ -2317,7 +2325,7 @@ private struct CardGridLayout: View {
                                 .font(.system(size: 9, design: .rounded))
                                 .foregroundStyle(.tertiary)
                         }
-                        Text("\(Int(menuDisplayPercent(remainingPercent: model.percentage, displayMode: displayMode)))%")
+                        Text(menuPercentText(remainingPercent: model.percentage, displayMode: displayMode))
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(menuStatusColor(remainingPercent: model.percentage, displayMode: displayMode))
                     }
@@ -2381,15 +2389,15 @@ private struct PercentageBadge: View {
     var color: Color {
         menuStatusColor(remainingPercent: percentage, displayMode: settings.quotaDisplayMode)
     }
-    
-    private var displayPercent: Double {
-        menuDisplayPercent(remainingPercent: percentage, displayMode: settings.quotaDisplayMode)
+
+    private var displayText: String {
+        menuPercentText(remainingPercent: percentage, displayMode: settings.quotaDisplayMode)
     }
-    
+
     var body: some View {
         switch style {
         case .pill:
-            Text("\(Int(displayPercent))%")
+            Text(displayText)
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(color)
                 .padding(.horizontal, 6)
@@ -2397,7 +2405,7 @@ private struct PercentageBadge: View {
                 .background(color.opacity(0.1))
                 .clipShape(Capsule())
         case .textOnly:
-            Text("\(Int(displayPercent))%")
+            Text(displayText)
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .foregroundStyle(color)
         }
@@ -2436,7 +2444,9 @@ private struct MenuModelDetailView: View {
             }
 
             if !model.isStandaloneMetric && displayStyle != .ring {
-                Text(String(format: "%.0f%% %@", displayPercent, displayMode.suffixKey.localized()))
+                Text(displayPercent >= 0
+                    ? String(format: "%.0f%% %@", displayPercent, displayMode.suffixKey.localized())
+                    : "—")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundStyle(statusColor)
             }
@@ -2448,7 +2458,17 @@ private struct MenuModelDetailView: View {
             }
 
             if !model.isStandaloneMetric && displayStyle == .ring {
-                RingProgressView(percent: displayPercent, size: 14, lineWidth: 2, tint: statusColor)
+                if RingProgressView.isUnknown(displayPercent) {
+                    // A 14pt ring has no room for a label, so replace it with the
+                    // same placeholder the other display styles render.
+                    Text("—")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(statusColor)
+                        .accessibilityLabel("usage.ring".localized())
+                        .accessibilityValue("quota.noDataYet".localized())
+                } else {
+                    RingProgressView(percent: displayPercent, size: 14, lineWidth: 2, tint: statusColor)
+                }
             }
         }
         .padding(.horizontal, 12)
