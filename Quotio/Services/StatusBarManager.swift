@@ -82,8 +82,9 @@ final class StatusBarManager: NSObject, NSMenuDelegate {
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.setFrameSize(hostingView.intrinsicContentSize)
         
-        // Add horizontal padding to align with native status bar spacing
-        let horizontalPadding: CGFloat = 4
+        // Keep the status item close to neighboring macOS menu bar icons.
+        // StatusBarQuotaView already sizes its content, so only a small click-edge inset is needed.
+        let horizontalPadding: CGFloat = 1
         let contentSize = hostingView.intrinsicContentSize
         let containerSize = NSSize(
             width: contentSize.width + horizontalPadding * 2,
@@ -218,7 +219,6 @@ struct StatusBarQuotaView: View {
                 StatusBarQuotaItemView(item: item, colorMode: colorMode)
             }
         }
-        .padding(.horizontal, 4)
         .frame(height: 22)
         .fixedSize()
     }
@@ -253,6 +253,14 @@ struct StatusBarQuotaItemView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.orange)
+            } else if let quotaWindows = item.quotaWindows {
+                VStack(alignment: .trailing, spacing: -1) {
+                    compactQuotaText(quotaWindows.fiveHourPercentage)
+                    compactQuotaText(quotaWindows.weeklyPercentage)
+                }
+                .frame(height: 18)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(quotaWindowsAccessibilityLabel(quotaWindows))
             } else if item.percentage >= 0 {
                 Text(formatPercentage(displayPercent))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -268,5 +276,34 @@ struct StatusBarQuotaItemView: View {
         // Defensive clamp to valid 0-100 range
         let clamped = min(100, max(0, value))
         return String(format: "%.0f%%", clamped.rounded())
+    }
+
+    private func compactQuotaText(_ remainingValue: Double) -> some View {
+        let displayedValue = remainingValue < 0
+            ? -1
+            : settings.quotaDisplayMode.displayValue(from: remainingValue)
+        let quotaColor: Color = remainingValue < 0
+            ? .secondary
+            : item.statusColor(for: remainingValue)
+
+        return Text(formatPercentage(displayedValue))
+            .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
+            .foregroundStyle(colorMode == .colored ? quotaColor : .primary)
+            .fixedSize()
+    }
+
+    private func quotaWindowsAccessibilityLabel(_ windows: MenuBarQuotaWindows) -> String {
+        let displayMode = settings.quotaDisplayMode
+        let fiveHour = formatPercentage(
+            windows.fiveHourPercentage < 0
+                ? -1
+                : displayMode.displayValue(from: windows.fiveHourPercentage)
+        )
+        let weekly = formatPercentage(
+            windows.weeklyPercentage < 0
+                ? -1
+                : displayMode.displayValue(from: windows.weeklyPercentage)
+        )
+        return "\("clinepass.quota.fiveHour".localized()): \(fiveHour), \("quota.metric.weekly".localized()): \(weekly)"
     }
 }
