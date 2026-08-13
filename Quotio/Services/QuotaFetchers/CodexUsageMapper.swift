@@ -54,9 +54,20 @@ nonisolated enum CodexUsageMapper {
         for snapshot: CodexUsageResponseV2.WindowSnapshot,
         fallback: StandardWindowKind
     ) -> StandardWindowKind {
-        guard let seconds = snapshot.limitWindowSeconds, seconds > 0 else { return fallback }
-        if seconds >= 6 * 24 * 60 * 60 { return .weekly }
-        if seconds <= 24 * 60 * 60 { return .session }
+        let day = 24 * 60 * 60
+        if let seconds = snapshot.limitWindowSeconds, seconds > 0 {
+            if seconds >= 6 * day { return .weekly }
+            if seconds <= day { return .session }
+            return fallback
+        }
+        // Heuristic, used only when the authoritative `limit_window_seconds` is
+        // absent. `reset_after_seconds` is the time REMAINING in the window, not
+        // the window's length, so it is only ever a lower bound: a horizon of
+        // more than a day rules out the 5h session window, but it cannot tell how
+        // long the window actually is, and a weekly window that is less than a day
+        // from resetting is indistinguishable from a session one and falls through
+        // to the positional fallback below.
+        if let resetAfter = snapshot.resetAfterSeconds, resetAfter > day { return .weekly }
         return fallback
     }
 
@@ -261,11 +272,13 @@ nonisolated struct CodexUsageResponseV2: Decodable {
     struct WindowSnapshot: Decodable {
         var usedPercent: Int
         var resetAt: Int?
+        var resetAfterSeconds: Int?
         var limitWindowSeconds: Int?
 
         enum CodingKeys: String, CodingKey {
             case usedPercent = "used_percent"
             case resetAt = "reset_at"
+            case resetAfterSeconds = "reset_after_seconds"
             case limitWindowSeconds = "limit_window_seconds"
         }
 
@@ -273,6 +286,7 @@ nonisolated struct CodexUsageResponseV2: Decodable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             usedPercent = (try Self.flexibleInt(container, forKey: .usedPercent)).clamped(to: 0...100)
             resetAt = try? Self.flexibleInt(container, forKey: .resetAt)
+            resetAfterSeconds = try? Self.flexibleInt(container, forKey: .resetAfterSeconds)
             limitWindowSeconds = try? Self.flexibleInt(container, forKey: .limitWindowSeconds)
         }
 
