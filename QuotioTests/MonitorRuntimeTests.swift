@@ -1,4 +1,5 @@
 import CryptoKit
+import LocalAuthentication
 import Security
 import SQLite3
 import XCTest
@@ -204,15 +205,13 @@ final class MonitorRuntimeTests: XCTestCase {
 
         XCTAssertEqual(readQuery[kSecAttrService as String] as? String, "gh:github.com")
         XCTAssertEqual(readQuery[kSecAttrAccount as String] as? String, "github.com")
-        XCTAssertEqual(
-            readQuery[kSecUseAuthenticationUI as String] as? String,
-            kSecUseAuthenticationUIFail as String
+        XCTAssertTrue(
+            (readQuery[kSecUseAuthenticationContext as String] as? LAContext)?.interactionNotAllowed == true
         )
         XCTAssertEqual(updateQuery[kSecAttrService as String] as? String, "gh:github.com")
         XCTAssertEqual(updateQuery[kSecAttrAccount as String] as? String, "github.com")
-        XCTAssertEqual(
-            updateQuery[kSecUseAuthenticationUI as String] as? String,
-            kSecUseAuthenticationUIFail as String
+        XCTAssertTrue(
+            (updateQuery[kSecUseAuthenticationContext as String] as? LAContext)?.interactionNotAllowed == true
         )
     }
 

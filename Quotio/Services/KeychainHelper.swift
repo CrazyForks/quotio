@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import LocalAuthentication
 import Security
 
 // MARK: - Keychain Helper
@@ -198,7 +199,7 @@ enum KeychainHelper {
         let query = externalCredentialQuery(service: service, account: account)
 
         var result: AnyObject?
-        let status = performSecurityCall(allowUserInteraction: false) {
+        let status = performSecurityCall {
             SecItemCopyMatching(query as CFDictionary, &result)
         }
         if status == errSecSuccess,
@@ -214,13 +215,15 @@ enum KeychainHelper {
     }
 
     nonisolated static func externalCredentialQuery(service: String, account: String? = nil) -> [String: Any] {
+        let context = LAContext()
+        context.interactionNotAllowed = true
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecReturnAttributes as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
+            kSecUseAuthenticationContext as String: context,
         ]
         if let account, !account.isEmpty {
             query[kSecAttrAccount as String] = account
@@ -243,7 +246,7 @@ enum KeychainHelper {
             return false
         }
         let query = externalCredentialUpdateQuery(service: service, account: account)
-        let status = performSecurityCall(allowUserInteraction: false) {
+        let status = performSecurityCall {
             SecItemUpdate(
                 query as CFDictionary,
                 [kSecValueData as String: newData] as CFDictionary
@@ -253,11 +256,13 @@ enum KeychainHelper {
     }
 
     nonisolated static func externalCredentialUpdateQuery(service: String, account: String) -> [String: Any] {
-        [
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        return [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
+            kSecUseAuthenticationContext as String: context,
         ]
     }
 
@@ -423,22 +428,10 @@ enum KeychainHelper {
     }
 
     nonisolated private static func performSecurityCall(
-        allowUserInteraction: Bool = true,
         _ operation: () -> OSStatus
     ) -> OSStatus {
         securityLock.lock()
         defer { securityLock.unlock() }
-
-        guard !allowUserInteraction else { return operation() }
-
-        var wasAllowed = DarwinBoolean(false)
-        guard SecKeychainGetUserInteractionAllowed(&wasAllowed) == errSecSuccess,
-              SecKeychainSetUserInteractionAllowed(false) == errSecSuccess else {
-            return errSecInteractionNotAllowed
-        }
-        defer {
-            _ = SecKeychainSetUserInteractionAllowed(wasAllowed.boolValue)
-        }
         return operation()
     }
 }

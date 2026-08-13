@@ -9,6 +9,7 @@
 import CryptoKit
 import Foundation
 import IOKit
+import LocalAuthentication
 @preconcurrency import Security
 
 nonisolated struct YubiKeyPIVIdentity: Identifiable, Hashable, @unchecked Sendable {
@@ -283,11 +284,13 @@ nonisolated enum YubiKeySecretVault {
     }
 
     static func availableIdentities() -> [YubiKeyPIVIdentity] {
+        let context = LAContext()
+        context.interactionNotAllowed = true
         let query: [String: Any] = [
             kSecClass as String: kSecClassIdentity,
             kSecReturnRef as String: true,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
+            kSecUseAuthenticationContext as String: context,
         ]
         var result: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
