@@ -11,6 +11,11 @@ import Security
 // MARK: - Keychain Helper
 
 enum KeychainHelper {
+    nonisolated enum MonitorCredentialBackend: Equatable {
+        case keychain
+        case vault
+    }
+
     nonisolated private static let securityLock = NSRecursiveLock()
     private static let remoteService = "dev.quotio.desktop.remote-management"
     private static let localService = "dev.quotio.desktop.local-management"
@@ -161,6 +166,9 @@ enum KeychainHelper {
               MonitorIdentity.fingerprint(current.base64EncodedString()) == expectedFingerprint else {
             return false
         }
+        if monitorCredentialBackend(vaultEnabled: YubiKeySecretVault.isEnabled) == .vault {
+            return YubiKeySecretVault.save(data, service: monitorAuthService, account: account)
+        }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: monitorAuthService,
@@ -172,6 +180,10 @@ enum KeychainHelper {
                 [kSecValueData as String: data] as CFDictionary
             )
         } == errSecSuccess
+    }
+
+    nonisolated static func monitorCredentialBackend(vaultEnabled: Bool) -> MonitorCredentialBackend {
+        vaultEnabled ? .vault : .keychain
     }
 
     /// Read a credential owned by another local CLI/app without mutating it.
@@ -273,6 +285,31 @@ enum KeychainHelper {
 
 
     nonisolated private static func saveData(_ data: Data, service: String, account: String) -> Bool {
+        if YubiKeySecretVault.isEnabled {
+            let existing = YubiKeySecretVault.readResult(service: service, account: account)
+            guard allowsVaultOverwrite(existing) else {
+                Log.keychain("Refusing to overwrite unreadable vault envelope (service: \(service), account: \(account))")
+                return false
+            }
+            return YubiKeySecretVault.save(data, service: service, account: account)
+        }
+        return saveKeychainData(data, service: service, account: account)
+    }
+
+    /// Whether a vault write may proceed over whatever is already stored.
+    ///
+    /// A caller that could not read a secret cannot tell "absent" from "hardware
+    /// key unavailable", so it may regenerate one and store it -- destroying the
+    /// envelope that still holds the real value. `CLIProxyManager` does exactly
+    /// this at construction. Refuse rather than roll a live credential back.
+    /// `.absent` costs only a file-existence check, so first writes stay
+    /// prompt-free; only an overwrite pays for a decrypt.
+    nonisolated static func allowsVaultOverwrite(_ existing: YubiKeySecretVault.ReadResult) -> Bool {
+        if case .unreadable = existing { return false }
+        return true
+    }
+
+    nonisolated private static func saveKeychainData(_ data: Data, service: String, account: String) -> Bool {
         let identity: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -311,6 +348,26 @@ enum KeychainHelper {
     }
 
     nonisolated private static func readData(service: String, account: String) -> Data? {
+        if YubiKeySecretVault.isEnabled {
+            let result = YubiKeySecretVault.readResult(service: service, account: account)
+            if case let .success(data) = result { return data }
+            // Only an absent envelope may be filled from a legacy Keychain copy.
+            // An unreadable one means the hardware key is unavailable or the
+            // envelope is bad, and overwriting it would roll the credential back.
+            guard YubiKeySecretVault.shouldMigrateLegacy(result) else { return nil }
+            // Move a legacy secret only after a complete encrypted write/read
+            // round trip has succeeded.
+            guard let legacy = readKeychainData(service: service, account: account),
+                  YubiKeySecretVault.save(legacy, service: service, account: account),
+                  case let .success(roundTripped) = YubiKeySecretVault.readResult(service: service, account: account),
+                  roundTripped == legacy else { return nil }
+            deleteKeychainData(service: service, account: account)
+            return legacy
+        }
+        return readKeychainData(service: service, account: account)
+    }
+
+    nonisolated private static func readKeychainData(service: String, account: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -344,6 +401,13 @@ enum KeychainHelper {
     }
 
     nonisolated private static func deleteData(service: String, account: String) {
+        if YubiKeySecretVault.isEnabled {
+            YubiKeySecretVault.delete(service: service, account: account)
+        }
+        deleteKeychainData(service: service, account: account)
+    }
+
+    nonisolated private static func deleteKeychainData(service: String, account: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

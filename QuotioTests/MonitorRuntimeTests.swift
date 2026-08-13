@@ -5,6 +5,199 @@ import XCTest
 @testable import Quotio
 
 final class MonitorRuntimeTests: XCTestCase {
+    func testMonitorCredentialCASUsesActiveVaultBackend() {
+        XCTAssertEqual(KeychainHelper.monitorCredentialBackend(vaultEnabled: true), .vault)
+        XCTAssertEqual(KeychainHelper.monitorCredentialBackend(vaultEnabled: false), .keychain)
+    }
+
+    func testVaultMigrationOnlyFallsBackWhenEnvelopeIsAbsent() {
+        XCTAssertTrue(YubiKeySecretVault.shouldMigrateLegacy(.absent))
+        XCTAssertFalse(YubiKeySecretVault.shouldMigrateLegacy(.unreadable))
+        XCTAssertFalse(YubiKeySecretVault.shouldMigrateLegacy(.success(Data("current".utf8))))
+    }
+
+    func testMissingEnvelopeIsDistinguishedFromUnreadableEnvelope() {
+        let service = "tests"
+        let account = "unreadable-envelope-\(UUID().uuidString)"
+        XCTAssertEqual(
+            YubiKeySecretVault.readResult(service: service, account: "missing-\(account)"),
+            .absent
+        )
+        let digest = SHA256.hash(data: Data("\(service)\u{0}\(account)".utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Quotio", isDirectory: true)
+            .appendingPathComponent("YubiKeyVault", isDirectory: true)
+        let envelopeURL = directory.appendingPathComponent(digest).appendingPathExtension("qsv")
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try? Data("malformed envelope".utf8).write(to: envelopeURL)
+        defer { try? FileManager.default.removeItem(at: envelopeURL) }
+        XCTAssertEqual(
+            YubiKeySecretVault.readResult(service: service, account: account),
+            .unreadable
+        )
+    }
+
+    // MARK: - PIV provisioning preflight
+    //
+    // Fixtures are the literal output of `ykman piv info`, rendered through
+    // ykman's own pretty-printer so the shape cannot drift from the tool.
+
+    private static let occupiedSlotReport = """
+    PIV version:              5.7.1
+    PIN tries remaining:      3/3
+    PUK tries remaining:      3/3
+    Management key algorithm: AES192
+    Management key is stored on the YubiKey, protected by PIN.
+    CHUID: 3019d4e7...
+    CCC:   No data available
+    Slot 9D (KEY_MANAGEMENT):
+      Private key type: RSA2048
+      Subject DN:       CN=Quotio Secret Vault
+      Not after:        2036-01-01 00:00:00
+    """
+
+    private static let emptySlotReport = """
+    PIV version:              5.7.1
+    PIN tries remaining:      3/3
+    Management key algorithm: TDES
+    WARNING: Using default Management key!
+    CHUID: No data available
+    CCC:   No data available
+    """
+
+    private static let legacyFirmwareReport = """
+    PIV version:              4.3.7
+    PIN tries remaining:      15 or more
+    Management key algorithm: TDES
+    CHUID: No data available
+    CCC:   No data available
+    """
+
+    func testPreflightReportsOccupiedSlotAsDestructive() {
+        let preflight = YubiKeySecretVault.parsePreflight(Self.occupiedSlotReport)
+        XCTAssertEqual(preflight.slot9d, .occupied)
+        XCTAssertTrue(preflight.destroysExistingKey)
+        XCTAssertEqual(preflight.pinTriesRemaining, "3/3")
+    }
+
+    func testPreflightReportsEmptySlotOnlyWhenFirmwareCanProveIt() {
+        let preflight = YubiKeySecretVault.parsePreflight(Self.emptySlotReport)
+        XCTAssertEqual(preflight.slot9d, .empty)
+        XCTAssertFalse(preflight.destroysExistingKey)
+    }
+
+    /// Key metadata arrived in PIV 5.3. Below that a bare private key is
+    /// invisible to `piv info`, so "not listed" must never be read as "empty".
+    func testPreflightTreatsUnprovableSlotAsUnknownAndDestructive() {
+        let legacy = YubiKeySecretVault.parsePreflight(Self.legacyFirmwareReport)
+        XCTAssertEqual(legacy.slot9d, .unknown)
+        XCTAssertTrue(legacy.destroysExistingKey)
+        XCTAssertEqual(legacy.pinTriesRemaining, "15 or more")
+
+        let versionless = YubiKeySecretVault.parsePreflight("CHUID: No data available")
+        XCTAssertEqual(versionless.slot9d, .unknown)
+        XCTAssertTrue(versionless.destroysExistingKey)
+        XCTAssertNil(versionless.pinTriesRemaining)
+    }
+
+    /// A populated slot that is not 9d says nothing about 9d.
+    func testPreflightIgnoresOtherOccupiedSlots() {
+        let report = Self.emptySlotReport + """
+
+        Slot 9A (AUTHENTICATION):
+          Private key type: ECCP256
+        """
+        XCTAssertEqual(YubiKeySecretVault.parsePreflight(report).slot9d, .empty)
+    }
+
+    /// `provision` only feeds a management-key line when ykman will ask for one,
+    /// and ykman asks only while the key is unprotected. Misreading this shifts
+    /// the PIN onto the wrong prompt and burns a PIN attempt.
+    func testPreflightDetectsProtectedManagementKey() {
+        XCTAssertTrue(YubiKeySecretVault.parsePreflight(Self.occupiedSlotReport).managementKeyProtected)
+
+        let derived = YubiKeySecretVault.parsePreflight("""
+        PIV version:              5.7.1
+        Management key is derived from PIN.
+        """)
+        XCTAssertTrue(derived.managementKeyProtected)
+
+        let unprotected = YubiKeySecretVault.parsePreflight(Self.emptySlotReport)
+        XCTAssertFalse(unprotected.managementKeyProtected)
+        XCTAssertTrue(unprotected.usesDefaultManagementKey)
+    }
+
+    /// The instance ID is the value macOS actually reports, observed on a
+    /// YubiKey 5C NFC (5.4.3). Matching only the bare driver ID hid every PIV
+    /// identity, so Settings stayed on "not configured" after a successful setup.
+    func testPIVTokenMatchesInstanceIDNotJustDriverID() {
+        XCTAssertTrue(YubiKeySecretVault.isPIVToken("com.apple.pivtoken:48B9336CB599456CAC0A442D8EE59713"))
+        XCTAssertTrue(YubiKeySecretVault.isPIVToken("com.apple.pivtoken"))
+        XCTAssertTrue(YubiKeySecretVault.isPIVToken("com.apple.CryptoTokenKit.pivtoken"))
+    }
+
+    func testPIVTokenRejectsSoftwareAndSecureEnclaveKeys() {
+        XCTAssertFalse(YubiKeySecretVault.isPIVToken(nil))
+        XCTAssertFalse(YubiKeySecretVault.isPIVToken(""))
+        XCTAssertFalse(YubiKeySecretVault.isPIVToken("com.apple.setoken"))
+        // Prefix-only matching would wrongly accept an unrelated driver.
+        XCTAssertFalse(YubiKeySecretVault.isPIVToken("com.apple.pivtokenizer:1234"))
+    }
+
+    /// The rollback this prevents: with the vault enabled and the key absent or
+    /// the PIN prompt dismissed, `CLIProxyManager.init` reads nil, mints a fresh
+    /// UUID and saves it — destroying the envelope holding the real management
+    /// key. Absent must still be writable, or first-time storage would break.
+    func testVaultWriteRefusesToOverwriteUnreadableEnvelope() {
+        XCTAssertFalse(KeychainHelper.allowsVaultOverwrite(.unreadable))
+        XCTAssertTrue(KeychainHelper.allowsVaultOverwrite(.absent))
+        XCTAssertTrue(KeychainHelper.allowsVaultOverwrite(.success(Data("rotated".utf8))))
+    }
+
+    /// Covers the effect through a public entry point. Honest limit: with no
+    /// identity selected the vault write would fail regardless, so this pins the
+    /// outcome but does not by itself prove the guard short-circuits first —
+    /// `allowsVaultOverwrite` above covers the decision, and separating an
+    /// unreadable envelope from a missing key needs hardware.
+    @MainActor
+    func testUnreadableEnvelopeSurvivesACredentialSave() {
+        let defaults = UserDefaults.standard
+        let fingerprintKey = "yubikeyPIVVaultFingerprint"
+        let previousFingerprint = defaults.string(forKey: fingerprintKey)
+        defaults.set("0000000000000000000000000000000000000000000000000000000000000000", forKey: fingerprintKey)
+        defer {
+            if let previousFingerprint {
+                defaults.set(previousFingerprint, forKey: fingerprintKey)
+            } else {
+                defaults.removeObject(forKey: fingerprintKey)
+            }
+        }
+        XCTAssertTrue(YubiKeySecretVault.isEnabled)
+
+        // A per-run account, so the real credentials of whoever runs the suite
+        // are never the thing being overwritten.
+        let configId = UUID().uuidString
+        let service = "dev.quotio.desktop.remote-management"
+        let account = "management-key-\(configId)"
+        let digest = SHA256.hash(data: Data("\(service)\u{0}\(account)".utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Quotio", isDirectory: true)
+            .appendingPathComponent("YubiKeyVault", isDirectory: true)
+        let envelopeURL = directory.appendingPathComponent(digest).appendingPathExtension("qsv")
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let sentinel = Data("sealed-credential-that-must-survive".utf8)
+        try? sentinel.write(to: envelopeURL)
+        defer { try? FileManager.default.removeItem(at: envelopeURL) }
+
+        XCTAssertEqual(YubiKeySecretVault.readResult(service: service, account: account), .unreadable)
+        KeychainHelper.saveManagementKey("regenerated-by-a-failed-read", for: configId)
+        XCTAssertEqual(try? Data(contentsOf: envelopeURL), sentinel)
+    }
+
     func testExternalCredentialOperationsDoNotAllowAuthenticationUI() {
         let readQuery = KeychainHelper.externalCredentialQuery(service: "gh:github.com", account: "github.com")
         let updateQuery = KeychainHelper.externalCredentialUpdateQuery(service: "gh:github.com", account: "github.com")
@@ -875,6 +1068,17 @@ final class MonitorRuntimeTests: XCTestCase {
     }
 
     func testMonitorCredentialVaultAddsRotatesAndDeletesAPIKeys() async throws {
+        // The test host shares the app's defaults, so whoever has enabled the
+        // vault runs this against the vault: every read then needs a physical
+        // PIN entry (the slot is `--pin-policy always`), and the run stalls,
+        // prompts once per read, and fails. Skip rather than force the Keychain
+        // path -- clearing the fingerprint would switch off a real security
+        // setting, and a crash mid-test would leave it off.
+        try XCTSkipIf(
+            YubiKeySecretVault.isEnabled,
+            "Requires the Keychain backend; disable the YubiKey vault in Settings to run."
+        )
+
         for provider in [AIProvider.factoryDroid, .openRouter, .amp] {
             let metadataURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent(UUID().uuidString)
