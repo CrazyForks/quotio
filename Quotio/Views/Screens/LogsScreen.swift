@@ -153,7 +153,7 @@ struct LogsScreen: View {
                 Text("logs.filter.allProviders".localized()).tag(nil as String?)
                 Divider()
                 ForEach(Array(stats.byProvider.keys.sorted()), id: \.self) { provider in
-                    Text(provider.capitalized).tag(provider as String?)
+                    Text(RequestLog.displayName(forProvider: provider)).tag(provider as String?)
                 }
             }
             .pickerStyle(.menu)
@@ -167,12 +167,12 @@ struct LogsScreen: View {
         var requests = viewModel.requestTracker.requestHistory
         
         if let provider = requestFilterProvider {
-            requests = requests.filter { $0.provider == provider }
+            requests = requests.filter { $0.effectiveProvider == provider }
         }
-        
+
         if !searchText.isEmpty {
             requests = requests.filter {
-                ($0.provider?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                ($0.effectiveProvider?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 ($0.model?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 ($0.endpoint.localizedCaseInsensitiveContains(searchText))
             }
@@ -315,40 +315,32 @@ struct RequestRow: View {
                 // Status Badge
                 statusBadge
 
-                // Provider & Model with Fallback Route
+                // Provider Badge
+                providerBadge
+                    .frame(width: 104, alignment: .leading)
+
+                // Model with Fallback Route
                 VStack(alignment: .leading, spacing: 2) {
                     if request.hasFallbackRoute {
                         // Show fallback route: virtual model → resolved model
+                        Text(request.model ?? "unknown")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.orange)
                         HStack(spacing: 4) {
-                            Text(request.model ?? "unknown")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.orange)
                             Image(systemName: "arrow.right")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                            Text(request.resolvedProvider?.capitalized ?? "")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundStyle(.blue)
-                        }
-                        Text(request.resolvedModel ?? "")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    } else {
-                        // Normal display
-                        if let provider = request.provider {
-                            Text(provider.capitalized)
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        if let model = request.model {
-                            Text(model)
+                            Text(request.resolvedModel ?? "")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
+                    } else if let model = request.model {
+                        Text(model)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
                 .frame(width: 180, alignment: .leading)
@@ -451,6 +443,47 @@ struct RequestRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var providerBadge: some View {
+        if let provider = request.effectiveProvider {
+            Text(RequestLog.displayName(forProvider: provider))
+                .font(.system(.caption2, weight: .semibold))
+                .foregroundStyle(providerColor(provider))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(providerColor(provider).opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .lineLimit(1)
+                .help(providerTooltip(for: provider))
+        } else {
+            Text("logs.provider.unknown".localized())
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    /// Spells out that the badge is the serving provider while the endpoint only fixes the
+    /// protocol — the two differ whenever a non-OpenAI model uses `/v1/chat/completions`.
+    private func providerTooltip(for provider: String) -> String {
+        let name = RequestLog.displayName(forProvider: provider)
+        guard let requestProtocol = request.requestProtocol else { return name }
+        return String(format: "logs.provider.tooltip".localized(), name, requestProtocol.displayName)
+    }
+
+    private func providerColor(_ provider: String) -> Color {
+        let id = RequestLog.canonicalProviderID(provider)
+        if let known = AIProvider(rawValue: id) {
+            return known.color
+        }
+        switch id {
+        case "openai": return .green
+        case "gemini": return .blue
+        case "deepseek": return .indigo
+        case "kimi", "minimax", "mimo": return .teal
+        default: return .gray
+        }
     }
 
     private var statusBadge: some View {
