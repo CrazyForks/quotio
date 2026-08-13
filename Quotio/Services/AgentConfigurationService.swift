@@ -1600,7 +1600,13 @@ actor AgentConfigurationService {
         }
     }
     
-    func fetchAvailableModels(config: AgentConfiguration) async throws -> [AvailableModel] {
+    /// Fetches the proxy's OpenAI-compatible `/v1/models` response exactly as reported.
+    ///
+    /// Nothing is substituted, cached or filtered: the result is the response body
+    /// and nothing else, and any transport/decoding problem is thrown rather than
+    /// masked. Callers that must show whether a catalog is genuinely live use this;
+    /// `fetchAvailableModels(config:)` layers agent-setup-specific filtering on top.
+    func fetchModelCatalog(config: AgentConfiguration) async throws -> [ModelCatalogEntry] {
         guard let url = URL(string: "\(config.proxyURL)/models") else {
             throw URLError(.badURL)
         }
@@ -1617,41 +1623,24 @@ actor AgentConfigurationService {
             throw URLError(.badServerResponse)
         }
 
-        // Parse struct matching OpenAI /v1/models response
-        struct ModelsResponse: Decodable {
-            struct ModelItem: Decodable {
-                let id: String
-                let owned_by: String?
-            }
-            let data: [ModelItem]
-        }
+        // Parse OpenAI-compatible /v1/models response
+        return try ModelCatalog.parse(data)
+    }
 
-        let decoded = try JSONDecoder().decode(ModelsResponse.self, from: data)
+    func fetchAvailableModels(config: AgentConfiguration) async throws -> [AvailableModel] {
+        let parsedModels = ModelCatalog.agentSetupModels(from: try await fetchModelCatalog(config: config))
 
         // Fetch available Copilot models to filter out unavailable ones
         let copilotFetcher = CopilotQuotaFetcher()
         let availableCopilotModelIds = await copilotFetcher.fetchUserAvailableModelIds()
 
-        return decoded.data.compactMap { item in
-            let provider = item.owned_by ?? "openai"
-
+        return parsedModels.filter { model in
             // Filter GitHub Copilot models - only include those actually available to the user
-            if provider == "github-copilot" {
-                // If we have Copilot accounts, filter by available models
-                if !availableCopilotModelIds.isEmpty {
-                    guard availableCopilotModelIds.contains(item.id) else {
-                        return nil
-                    }
-                }
-                // If no Copilot accounts, still show the model (user might add account later)
+            // If no Copilot accounts, still show the model (user might add account later)
+            if model.provider == "github-copilot", !availableCopilotModelIds.isEmpty {
+                return availableCopilotModelIds.contains(model.id)
             }
-
-            return AvailableModel(
-                id: item.id,
-                name: item.id,
-                provider: provider,
-                isDefault: false
-            )
+            return true
         }
     }
     

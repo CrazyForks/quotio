@@ -4089,6 +4089,314 @@
         }
       }
     },
+    "availableModels.copied" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copié"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã sao chép"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已复制"
+          }
+        }
+      }
+    },
+    "availableModels.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click a model ID to copy it for use in your client configuration."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquez sur un identifiant de modèle pour le copier dans la configuration de votre client."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhấp vào ID mô hình để sao chép và dùng trong cấu hình client của bạn."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按模型 ID 即可复制，用于客户端配置。"
+          }
+        }
+      }
+    },
+    "availableModels.empty" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The proxy did not report any models. Add a provider account, then refresh."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le proxy n'a signalé aucun modèle. Ajoutez un compte fournisseur, puis actualisez."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy không trả về mô hình nào. Hãy thêm tài khoản nhà cung cấp rồi làm mới."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理未返回任何模型。请添加提供商账户后刷新。"
+          }
+        }
+      }
+    },
+    "availableModels.error" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not load the model list from the proxy. Try refreshing."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de charger la liste des modèles depuis le proxy. Essayez d'actualiser."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể tải danh sách mô hình từ proxy. Hãy thử làm mới."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从代理加载模型列表。请尝试刷新。"
+          }
+        }
+      }
+    },
+    "availableModels.live" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live from the proxy · fetched at %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En direct depuis le proxy · récupéré à %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trực tiếp từ proxy · lấy lúc %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实时来自代理 · 获取于 %@"
+          }
+        }
+      }
+    },
+    "availableModels.loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading models..."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement des modèles..."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang tải mô hình..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载模型…"
+          }
+        }
+      }
+    },
+    "availableModels.modelCount" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d models"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d modèles"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d mô hình"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 个模型"
+          }
+        }
+      }
+    },
+    "availableModels.owner" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Owner: %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propriétaire : %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chủ sở hữu: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有者：%@"
+          }
+        }
+      }
+    },
+    "availableModels.ownerNote" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Owner is the model-owner metadata reported by /v1/models. It does not indicate which provider account will serve a request."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le propriétaire est la métadonnée de propriétaire du modèle signalée par /v1/models. Elle n'indique pas quel compte fournisseur traitera une requête."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chủ sở hữu là siêu dữ liệu về chủ sở hữu mô hình do /v1/models cung cấp. Nó không cho biết tài khoản nhà cung cấp nào sẽ xử lý yêu cầu."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有者是 /v1/models 提供的模型所有者元数据，并不表示哪个提供商账户会处理请求。"
+          }
+        }
+      }
+    },
+    "availableModels.proxyStopped" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start the proxy to see the models you can use."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrez le proxy pour voir les modèles que vous pouvez utiliser."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động proxy để xem các mô hình bạn có thể dùng."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启动代理以查看可用的模型。"
+          }
+        }
+      }
+    },
+    "availableModels.stale" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh failed — showing the list fetched at %@, which may be out of date."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec de l'actualisation — affichage de la liste récupérée à %@, qui peut être obsolète."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Làm mới thất bại — đang hiển thị danh sách lấy lúc %@, có thể đã lỗi thời."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刷新失败 — 显示的是 %@ 获取的列表，可能已过时。"
+          }
+        }
+      }
+    },
     "badge.experimental" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6424,6 +6732,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "API 端点"
+          }
+        }
+      }
+    },
+    "dashboard.availableModels" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available Models"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèles disponibles"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mô hình khả dụng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用模型"
           }
         }
       }
