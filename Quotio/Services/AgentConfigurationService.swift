@@ -219,10 +219,10 @@ actor AgentConfigurationService {
         
         guard fileManager.fileExists(atPath: configPath),
               let data = fileManager.contents(atPath: configPath),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let json = try? OpenCodeConfigEditor.parseObject(data) else {
             return nil
         }
-        
+
         // Check for quotio provider
         guard let providers = json["provider"] as? [String: Any],
               let quotioProvider = providers["quotio"] as? [String: Any],
@@ -944,21 +944,26 @@ actor AgentConfigurationService {
         if mode == .automatic && fileManager.fileExists(atPath: configPath) {
             do {
                 let data = try Data(contentsOf: URL(fileURLWithPath: configPath))
-                var config = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
-                
-                // Create backup
-                let backupPath = "\(configPath).backup.\(Int(Date().timeIntervalSince1970))"
-                try fileManager.copyItem(atPath: configPath, toPath: backupPath)
-                
-                // Remove quotio provider
-                if var providers = config["provider"] as? [String: Any] {
-                    providers.removeValue(forKey: "quotio")
-                    config["provider"] = providers.isEmpty ? nil : providers
+
+                // Remove only the Quotio-managed provider entry, preserving
+                // every other user setting — comments included (#176). When
+                // there is nothing to remove, leave the file untouched.
+                guard let updatedData = try OpenCodeConfigEditor.removingProviders(existing: data, keys: ["quotio"]) else {
+                    return .success(
+                        type: .file,
+                        mode: mode,
+                        configPath: configPath,
+                        authPath: nil,
+                        shellConfig: nil,
+                        rawConfigs: [],
+                        instructions: "agents.opencode.notConfigured".localizedStatic(),
+                        modelsConfigured: 0
+                    )
                 }
-                
-                let updatedData = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys])
+
+                _ = try backupIfPresent(configPath)
                 try updatedData.write(to: URL(fileURLWithPath: configPath))
-                
+
                 return .success(
                     type: .file,
                     mode: mode,
@@ -1400,24 +1405,30 @@ actor AgentConfigurationService {
         ]
 
         do {
-            var existingConfig: [String: Any] = [:]
+            let existingData = fileManager.contents(atPath: configPath)
 
-            if fileManager.fileExists(atPath: configPath),
-               let existingData = fileManager.contents(atPath: configPath),
-               let parsed = try? JSONSerialization.jsonObject(with: existingData) as? [String: Any] {
-                existingConfig = parsed
+            let jsonData: Data
+            do {
+                jsonData = try OpenCodeConfigEditor.merging(
+                    existing: existingData,
+                    providers: ["quotio": quotioProvider]
+                )
+            } catch {
+                if mode == .automatic && existingData != nil {
+                    // Never fall back to overwriting a file we could not parse:
+                    // that wipes user settings like `plugin` and other providers (#176).
+                    return .failure(error: String(
+                        format: "agents.opencode.parseFailed".localizedStatic(),
+                        configPath,
+                        error.localizedDescription
+                    ))
+                }
+                jsonData = try OpenCodeConfigEditor.merging(
+                    existing: nil,
+                    providers: ["quotio": quotioProvider]
+                )
             }
-
-            if existingConfig["$schema"] == nil {
-                existingConfig["$schema"] = "https://opencode.ai/config.json"
-            }
-
-            var providers = existingConfig["provider"] as? [String: Any] ?? [:]
-            providers["quotio"] = quotioProvider
-            existingConfig["provider"] = providers
-
-            let jsonData = try JSONSerialization.data(withJSONObject: existingConfig, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
-            let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+            let jsonString = String(decoding: jsonData, as: UTF8.self)
 
             let rawConfigs = [
                 RawConfigOutput(
@@ -1432,11 +1443,7 @@ actor AgentConfigurationService {
             if mode == .automatic {
                 try fileManager.createDirectory(atPath: configDir, withIntermediateDirectories: true)
 
-                var backupPath: String? = nil
-                if fileManager.fileExists(atPath: configPath) {
-                    backupPath = "\(configPath).backup.\(Int(Date().timeIntervalSince1970))"
-                    try? fileManager.copyItem(atPath: configPath, toPath: backupPath!)
-                }
+                let backupPath = try backupIfPresent(configPath)
 
                 try jsonData.write(to: URL(fileURLWithPath: configPath))
 
@@ -1522,7 +1529,7 @@ actor AgentConfigurationService {
 
         return modelConfig
     }
-    
+
     private func generateFactoryDroidConfig(config: AgentConfiguration, mode: ConfigurationMode, availableModels: [AvailableModel]) -> AgentConfigResult {
         let home = fileManager.homeDirectoryForCurrentUser.path
         let configDir = "\(home)/.factory"
