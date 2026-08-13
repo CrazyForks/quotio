@@ -198,7 +198,9 @@ final class QuotaViewModel {
     // MARK: - IDE Quota Persistence Keys
 
     private static let ideQuotasKey = "persisted.ideQuotas"
-    private static let ideProvidersToSave: Set<AIProvider> = [.cursor, .trae]
+    /// Providers whose quota is imported from a local IDE database and persisted
+    /// separately (Cursor, Trae). Also drives `refreshImportedIDEQuotas()`.
+    nonisolated static let ideProvidersToSave: Set<AIProvider> = [.cursor, .trae]
 
     /// Key for tracking when auth files last changed (for model cache invalidation)
     static let authFilesChangedKey = "quotio.authFiles.lastChanged"
@@ -825,6 +827,10 @@ final class QuotaViewModel {
         providerQuotas[.openRouter] = await openRouter
         providerQuotas[.amp] = await amp
         providerQuotas = providerQuotas.filter { !$0.value.isEmpty }
+
+        // Refresh (not re-import) already-imported Cursor/Trae accounts before the
+        // snapshot is persisted, so the menu bar matches the Providers screen (#163).
+        await refreshImportedIDEQuotas()
 
         monitorAccounts = await coordinator.discoverAccounts(merging: providerQuotas)
         removeDisabledMonitorQuotas()
@@ -1685,6 +1691,9 @@ final class QuotaViewModel {
             async let clinePass: () = refreshClinePassQuotasInternal()
 
             _ = await (antigravity, openai, copilot, claudeCode, glm, warp, kiro, clinePass)
+
+            // Refresh (not re-import) already-imported Cursor/Trae accounts (#163).
+            await refreshImportedIDEQuotas()
         }
 
         checkQuotaNotifications()
@@ -1727,6 +1736,9 @@ final class QuotaViewModel {
         async let clinePass: () = refreshClinePassQuotasInternal()
 
         _ = await (antigravity, codex, copilot, claudeCode, glm, warp, kiro, clinePass)
+
+        // Refresh (not re-import) already-imported Cursor/Trae accounts (#163).
+        await refreshImportedIDEQuotas()
 
         checkQuotaNotifications()
         pruneMenuBarItems()
@@ -2139,6 +2151,110 @@ final class QuotaViewModel {
         }
     }
     
+    /// Merge freshly read IDE quota data into the accounts that are already imported.
+    ///
+    /// Cursor and Trae accounts only exist once the user has explicitly run
+    /// "Scan for IDEs" (issue #29), and they can be deleted (issue #213). A global
+    /// refresh must therefore update the quota of the accounts that are currently
+    /// imported without importing any account key that is not already present —
+    /// otherwise a deleted account would resurrect on the next refresh.
+    ///
+    /// - Parameters:
+    ///   - fetched: everything the IDE fetcher could read from the local database.
+    ///   - existing: the account keys currently imported into `providerQuotas`.
+    /// - Returns: `existing`, with fresh data applied to the keys it already holds.
+    ///   Keys present only in `fetched` are dropped; keys the fetcher could not read
+    ///   this time keep their previous value instead of disappearing from the UI.
+    nonisolated static func mergeImportedIDEQuotas(
+        fetched: [String: ProviderQuotaData],
+        into existing: [String: ProviderQuotaData]
+    ) -> [String: ProviderQuotaData] {
+        guard !existing.isEmpty else { return existing }
+
+        var merged = existing
+        for (accountKey, quota) in fetched where existing[accountKey] != nil {
+            merged[accountKey] = quota
+        }
+        return merged
+    }
+
+    /// Refresh the quota of already-imported IDE-derived accounts (Cursor, Trae).
+    ///
+    /// This is the piece the global refresh actions were missing: `refreshAllQuotas`,
+    /// `refreshQuotasUnified` and `refreshQuotasDirectly` all skip Cursor/Trae, so the
+    /// menu bar refresh never updated them (issues #163, #257). Unlike the per-provider
+    /// re-import in `refreshQuota(for:)`, this only touches account keys that are
+    /// already imported, so it never re-imports from the IDE databases.
+    ///
+    /// Internal rather than private so the reentrancy regression tests can drive this
+    /// path directly instead of going through a global refresh that hits the network.
+    func refreshImportedIDEQuotas() async {
+        // `Set` iteration order is unspecified; sort so the sequence of suspension
+        // points is deterministic (and therefore testable).
+        for provider in Self.ideProvidersToSave.sorted(by: { $0.rawValue < $1.rawValue }) {
+            await refreshImportedIDEQuotas(for: provider)
+        }
+    }
+
+    /// Refresh a single IDE-derived provider while holding its refresh-coordination slot.
+    ///
+    /// `QuotaViewModel` is `@MainActor`, but a main actor is *reentrant*: the `await` on
+    /// the IDE fetcher below is a suspension point at which any other main-actor work can
+    /// run — a scoped refresh, an account deletion (issue #213), a re-scan. The previous
+    /// version of this method sampled `providerQuotas` and `activeRefreshProviders`
+    /// before that await and then wrote the resulting merge unconditionally, so anything
+    /// that changed while the fetch was suspended got clobbered by the stale snapshot.
+    ///
+    /// Two things close that window:
+    /// 1. The provider's slot in `activeRefreshProviders` is held for the *whole*
+    ///    fetch/write, so a scoped refresh cannot start midway through it (and if one is
+    ///    already running, this refresh yields to it instead of racing).
+    /// 2. `providerQuotas` is re-read *after* the await and the merge is applied to the
+    ///    keys that still exist at write time, so an account removed during the fetch
+    ///    stays removed instead of being resurrected from the pre-await snapshot.
+    private func refreshImportedIDEQuotas(for provider: AIProvider) async {
+        // Nothing imported for this provider: respect the explicit-scan consent model
+        // (issue #29) and do not pull anything in. No await between this read and the
+        // slot acquisition below, so the check cannot go stale.
+        guard providerQuotas[provider]?.isEmpty == false else { return }
+        // Claims the same slot `refreshQuota(for:)` uses, for the full fetch/write.
+        // Fails if a scoped refresh for this provider is already in flight — that one wins.
+        guard beginBatchRefresh(providers: [provider]) else { return }
+        defer { endBatchRefresh(providers: [provider]) }
+
+        let fetched = await fetchImportedIDEQuotas(for: provider)
+
+        // Re-read after the suspension point: the account may have been deleted, or the
+        // whole provider removed, while the fetch was in flight.
+        guard let current = providerQuotas[provider], !current.isEmpty else { return }
+        providerQuotas[provider] = Self.mergeImportedIDEQuotas(fetched: fetched, into: current)
+        // Persisted synchronously with the write so the saved snapshot cannot capture a
+        // half-applied state from a concurrent mutation.
+        savePersistedIDEQuotas()
+    }
+
+    #if DEBUG
+    /// Test seam: replaces the IDE database read so a test can suspend *inside* the fetch
+    /// and drive main-actor reentrancy deterministically. Never set outside tests.
+    @ObservationIgnored var ideQuotaFetchHookForTesting: (@MainActor (AIProvider) async -> [String: ProviderQuotaData])?
+    #endif
+
+    private func fetchImportedIDEQuotas(for provider: AIProvider) async -> [String: ProviderQuotaData] {
+        #if DEBUG
+        if let hook = ideQuotaFetchHookForTesting {
+            return await hook(provider)
+        }
+        #endif
+        switch provider {
+        case .cursor:
+            return await cursorFetcher.fetchAsProviderQuota()
+        case .trae:
+            return await traeFetcher.fetchAsProviderQuota()
+        default:
+            return [:]
+        }
+    }
+
     func startOAuth(for provider: AIProvider, authMethod: AuthCommand? = nil, launchMode: OAuthLaunchMode = .manual) async {
         if modeManager.isMonitorMode {
             await startMonitorOAuth(for: provider)
