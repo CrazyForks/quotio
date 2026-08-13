@@ -739,7 +739,7 @@ final class QuotaViewModel {
 
         providerQuotas[.codex] = await codexFetcher.reconcileLegacyAliases(in: await codex)
         providerQuotas[.claude] = await claude
-        providerQuotas[.copilot] = await copilot
+        providerQuotas[.copilot] = await copilotQuotaFetcher.reconcileLegacyAliases(in: await copilot)
         providerQuotas[.kiro] = await kiro
         providerQuotas[.glm] = await glm
         providerQuotas[.clinePass] = await clinePass
@@ -1880,6 +1880,31 @@ final class QuotaViewModel {
         await refreshQuota(for: provider)
     }
 
+    /// Runs a provider-scoped Copilot refresh and reconciles the result.
+    ///
+    /// `MonitorRefreshCoordinator.refresh` merges `previous` into the fetcher
+    /// output, so reconciling only the fetcher output is not enough: a Copilot-only
+    /// refresh would re-store the stale filename key that the merge carried over.
+    /// The reconciliation therefore runs on the *merged* dictionary, matching what
+    /// `refreshQuotasDirectly` does for the full refresh (#404).
+    nonisolated static func refreshCopilotThroughCoordinator(
+        coordinator: MonitorRefreshCoordinator,
+        fetcher: CopilotQuotaFetcher,
+        previous: [String: ProviderQuotaData],
+        credentialAvailability: MonitorCredentialAvailability,
+        authDir: String = "~/.cli-proxy-api",
+        operation: @escaping @Sendable () async -> [String: ProviderQuotaData]
+    ) async -> [String: ProviderQuotaData] {
+        let merged = await coordinator.refresh(
+            provider: .copilot,
+            force: true,
+            previous: previous,
+            credentialAvailability: credentialAvailability,
+            operation: operation
+        )
+        return await fetcher.reconcileLegacyAliases(in: merged, authDir: authDir)
+    }
+
     private func refreshMonitorProvider(_ provider: AIProvider) async {
         let coordinator = monitorCoordinator
         let previous = providerQuotas[provider] ?? [:]
@@ -1920,7 +1945,12 @@ final class QuotaViewModel {
             }
         case .copilot:
             let fetcher = copilotFetcher
-            fresh = await coordinatedRefresh {
+            fresh = await Self.refreshCopilotThroughCoordinator(
+                coordinator: coordinator,
+                fetcher: fetcher,
+                previous: previous,
+                credentialAvailability: credentialAvailability
+            ) {
                 await fetcher.fetchAllCopilotQuotas(includeMonitorCredentials: true)
             }
         case .kiro:
@@ -2436,10 +2466,18 @@ final class QuotaViewModel {
                 )
             }
             for file in directAuthFiles where file.provider == .copilot {
+                let filenameWithoutExtension = file.filename.hasSuffix(".json")
+                    ? String(file.filename.dropLast(".json".count))
+                    : file.filename
                 addAliases(
                     provider: .copilot,
                     canonicalKey: file.menuBarAccountKey,
-                    aliases: [file.email]
+                    aliases: [
+                        file.filename,
+                        filenameWithoutExtension,
+                        file.filename.copilotFilenameKey,
+                        file.email,
+                    ] + file.legacyIdentityKeys.map { $0 as String? }
                 )
             }
         }
@@ -2455,10 +2493,18 @@ final class QuotaViewModel {
             )
         }
         for file in authFiles where file.providerType == .copilot {
+            let filenameWithoutExtension = file.name.hasSuffix(".json")
+                ? String(file.name.dropLast(".json".count))
+                : file.name
             addAliases(
                 provider: .copilot,
                 canonicalKey: file.menuBarAccountKey,
-                aliases: [file.email]
+                aliases: [
+                    file.name,
+                    filenameWithoutExtension,
+                    file.name.copilotFilenameKey,
+                    file.email,
+                ]
             )
         }
 

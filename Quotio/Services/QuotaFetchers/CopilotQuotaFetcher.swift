@@ -148,6 +148,8 @@ nonisolated struct CopilotAuthFile: Codable, Sendable {
     let tokenType: String?
     let scope: String?
     let username: String?
+    /// Older CLIProxyAPI releases stored the GitHub handle under `login`.
+    let login: String?
     let type: String?
 
     enum CodingKeys: String, CodingKey {
@@ -155,8 +157,18 @@ nonisolated struct CopilotAuthFile: Codable, Sendable {
         case tokenType = "token_type"
         case scope
         case username
+        case login
         case type
     }
+}
+
+// MARK: - Copilot Account Identity
+
+/// Identity of one Copilot auth file: the canonical quota key plus the legacy
+/// keys older Quotio versions generated for the same file.
+nonisolated struct CopilotQuotaAccountIdentity: Sendable {
+    let canonicalKey: String
+    let aliases: [String]
 }
 
 // MARK: - Copilot API Token Response
@@ -248,7 +260,7 @@ actor CopilotQuotaFetcher {
             for file in files where file.hasPrefix("github-copilot-") && file.hasSuffix(".json") {
                 let path = (authDir as NSString).appendingPathComponent(file)
                 guard let authFile = loadAuthFile(from: path) else { continue }
-                let key = authFile.username ?? extractUsername(from: file)
+                let key = quotaKey(filename: file, authFile: authFile)
                 if key == accountKey {
                     return await fetchQuota(accessToken: authFile.accessToken)
                 }
@@ -324,8 +336,7 @@ actor CopilotQuotaFetcher {
             let filePath = (expandedPath as NSString).appendingPathComponent(file)
             if let authFile = loadAuthFile(from: filePath),
                let quota = await fetchQuota(authFilePath: filePath) {
-                let key = authFile.username ?? extractUsername(from: file)
-                results[key] = quota
+                results[quotaKey(filename: file, authFile: authFile)] = quota
             }
         }
         
@@ -492,6 +503,10 @@ actor CopilotQuotaFetcher {
     }
     
     private func extractUsername(from filename: String) -> String {
+        Self.extractUsername(from: filename)
+    }
+
+    private nonisolated static func extractUsername(from filename: String) -> String {
         var name = filename
         if name.hasPrefix("github-copilot-") {
             name = String(name.dropFirst("github-copilot-".count))
@@ -500,6 +515,118 @@ actor CopilotQuotaFetcher {
             name = String(name.dropLast(".json".count))
         }
         return name
+    }
+
+    // MARK: - Legacy Alias Reconciliation
+
+    /// Collapses legacy quota keys left behind by older Quotio versions (full
+    /// filename or filename-derived suffix) onto the canonical account key, so a
+    /// single auth file yields exactly one quota entry.
+    func reconcileLegacyAliases(
+        in quotas: [String: ProviderQuotaData],
+        authDir: String = "~/.cli-proxy-api"
+    ) -> [String: ProviderQuotaData] {
+        Self.reconcileLegacyAliases(in: quotas, accounts: readAccountIdentities(authDir: authDir))
+    }
+
+    nonisolated static func reconcileLegacyAliases(
+        in quotas: [String: ProviderQuotaData],
+        accounts: [CopilotQuotaAccountIdentity]
+    ) -> [String: ProviderQuotaData] {
+        var reconciled = quotas
+        let canonicalKeys = Set(accounts.map(\.canonicalKey))
+        var canonicalKeysByAlias: [String: Set<String>] = [:]
+        for account in accounts {
+            for alias in account.aliases where alias != account.canonicalKey {
+                canonicalKeysByAlias[alias, default: []].insert(account.canonicalKey)
+            }
+        }
+
+        for (alias, candidates) in canonicalKeysByAlias {
+            guard let aliasQuota = reconciled[alias],
+                  !canonicalKeys.contains(alias),
+                  candidates.count == 1,
+                  let canonicalKey = candidates.first else { continue }
+            reconciled.removeValue(forKey: alias)
+            if reconciled[canonicalKey].map({ $0.lastUpdated <= aliasQuota.lastUpdated }) ?? true {
+                reconciled[canonicalKey] = aliasQuota
+            }
+        }
+        return reconciled
+    }
+
+    // MARK: - Canonical Account Identity
+
+    /// The canonical identity field of a Copilot account.
+    ///
+    /// This is the single source of truth for Copilot field precedence. CLIProxyAPI
+    /// writes the GitHub handle as `username`; older auth files and the management
+    /// API expose it as `login` / `account`. `username` wins because that is the
+    /// field `fetchAllCopilotQuotas` keys its results by — any call site that picks
+    /// a different field ends up keying the same auth file twice (#404).
+    nonisolated static func canonicalIdentityField(username: String?, login: String?) -> String? {
+        for candidate in [username, login] {
+            guard let value = candidate?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !value.isEmpty else { continue }
+            return value
+        }
+        return nil
+    }
+
+    /// The canonical quota key for one Copilot auth file: the identity field when
+    /// present, the `github-copilot-*` filename suffix otherwise. Returns `nil`
+    /// when neither is available so callers keep their own final fallback.
+    nonisolated static func canonicalAccountKey(
+        filename: String,
+        username: String?,
+        login: String? = nil
+    ) -> String? {
+        canonicalIdentityField(username: username, login: login) ?? filename.copilotFilenameKey
+    }
+
+    /// Canonical key and legacy aliases for one Copilot auth file. The canonical
+    /// key matches the one `fetchAllCopilotQuotas` produces.
+    nonisolated static func accountIdentity(
+        filename: String,
+        username: String?,
+        login: String? = nil
+    ) -> CopilotQuotaAccountIdentity {
+        let filenameWithoutExtension = filename.hasSuffix(".json")
+            ? String(filename.dropLast(".json".count))
+            : filename
+        let filenameKey = extractUsername(from: filename)
+        let canonicalKey = canonicalAccountKey(filename: filename, username: username, login: login)
+            ?? filenameKey
+        return CopilotQuotaAccountIdentity(
+            canonicalKey: canonicalKey,
+            aliases: [filename, filenameWithoutExtension, filenameKey]
+        )
+    }
+
+    private func readAccountIdentities(authDir: String) -> [CopilotQuotaAccountIdentity] {
+        let expandedPath = NSString(string: authDir).expandingTildeInPath
+        guard let files = try? FileManager.default.contentsOfDirectory(atPath: expandedPath) else {
+            return []
+        }
+        return files.compactMap { file in
+            guard file.hasPrefix("github-copilot-"), file.hasSuffix(".json") else { return nil }
+            let path = (expandedPath as NSString).appendingPathComponent(file)
+            let authFile = loadAuthFile(from: path)
+            return Self.accountIdentity(
+                filename: file,
+                username: authFile?.username,
+                login: authFile?.login
+            )
+        }
+    }
+
+    /// The quota key this fetcher stores results under for `filename`.
+    private func quotaKey(filename: String, authFile: CopilotAuthFile) -> String {
+        Self.canonicalAccountKey(
+            filename: filename,
+            username: authFile.username,
+            login: authFile.login
+        ) ?? extractUsername(from: filename)
     }
 
     // MARK: - Copilot Available Models
