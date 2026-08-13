@@ -831,12 +831,22 @@ struct CustomProviderSheet: View {
             return
         }
         
-        let effectiveBaseURL = baseURL.isEmpty 
+        let effectiveBaseURL = baseURL.isEmpty
             ? (providerType.defaultBaseURL ?? "")
             : normalizedBaseURL(baseURL, for: providerType)
-        
+
         guard let modelsURL = makeModelsURL(baseURL: effectiveBaseURL, providerType: providerType) else {
             modelFetchError = "Invalid base URL"
+            return
+        }
+
+        // Normalize the form's headers once, and validate before any of them touch the
+        // request — the same canonical set is what gets persisted and emitted to YAML.
+        let customHeaders = providerType.supportsCustomHeaders
+            ? CustomHeader.canonicalized(headers)
+            : []
+        if let headerError = CustomHeader.validationErrors(in: customHeaders).first {
+            modelFetchError = headerError
             return
         }
 
@@ -861,11 +871,9 @@ struct CustomProviderSheet: View {
             request.setValue("Bearer \(firstKey.apiKey)", forHTTPHeaderField: "Authorization")
         }
         
-        // Add custom headers
-        for header in headers {
-            request.setValue(header.value, forHTTPHeaderField: header.key)
-        }
-        
+        // Add custom headers (canonical form, already validated above)
+        request.applyCustomHeaders(customHeaders)
+
         isLoadingModels = true
         modelFetchError = nil
         
@@ -936,7 +944,9 @@ struct CustomProviderSheet: View {
             prefix: prefix.trimmingCharacters(in: .whitespaces).isEmpty ? nil : prefix.trimmingCharacters(in: .whitespaces),
             apiKeys: apiKeys.filter { !$0.apiKey.trimmingCharacters(in: .whitespaces).isEmpty },
             models: limitToSelectedModels ? allModels : [],
-            headers: headers.filter { !$0.key.trimmingCharacters(in: .whitespaces).isEmpty },
+            headers: providerType.supportsCustomHeaders
+                ? CustomHeader.canonicalized(headers)
+                : [],
             limitToSelectedModels: limitToSelectedModels,
             isEnabled: isEnabled,
             createdAt: provider?.createdAt ?? Date(),
@@ -1017,10 +1027,9 @@ struct CustomProviderSheet: View {
             request.setValue("Bearer \(firstKey.apiKey)", forHTTPHeaderField: "Authorization")
         }
         
-        // Add custom headers if any
-        for header in provider.headers {
-            request.setValue(header.value, forHTTPHeaderField: header.key)
-        }
+        // Add custom headers if any — the same canonical set that is written to the
+        // generated CLIProxyAPI config, so the connection test exercises the real headers.
+        request.applyCustomHeaders(provider.effectiveHeaders)
         
         let (data, response) = try await URLSession.shared.data(for: request)
         

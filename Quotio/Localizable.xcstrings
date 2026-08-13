@@ -4862,6 +4862,93 @@
         }
       }
     },
+    "customProviders.error.headerNameDuplicate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate custom header names are not allowed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les noms d'en-têtes personnalisés en double ne sont pas autorisés"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không được phép trùng tên header tùy chỉnh"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义标头名称不能重复"
+          }
+        }
+      }
+    },
+    "customProviders.error.headerNameInvalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom header names may only contain letters, digits, and the characters !#$%&'*+-.^_`|~"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les noms d'en-têtes personnalisés ne peuvent contenir que des lettres, des chiffres et les caractères !#$%&'*+-.^_`|~"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tên header tùy chỉnh chỉ được chứa chữ cái, chữ số và các ký tự !#$%&'*+-.^_`|~"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义标头名称只能包含字母、数字以及字符 !#$%&'*+-.^_`|~"
+          }
+        }
+      }
+    },
+    "customProviders.error.headerValueInvalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Custom header values must be printable ASCII, without line breaks or control characters"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les valeurs d'en-têtes personnalisés doivent être en ASCII imprimable, sans saut de ligne ni caractère de contrôle"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giá trị header tùy chỉnh phải là ký tự ASCII in được, không có ký tự xuống dòng hoặc ký tự điều khiển"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义标头值必须为可打印的 ASCII 字符，不能包含换行符或控制字符"
+          }
+        }
+      }
+    },
     "customProviders.fetchModels" : {
       "extractionState" : "stale",
       "localizations" : {
