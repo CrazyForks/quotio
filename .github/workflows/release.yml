@@ -13,7 +13,6 @@ on:
 
 env:
   PROJECT_NAME: Quotio
-  SCHEME: Quotio
 
 jobs:
   build-and-release:
@@ -62,55 +61,20 @@ jobs:
           echo "Releasing version: ${VERSION}"
 
       # ===========================================
-      # 4. Update CHANGELOG if needed
-      # ===========================================
-      - name: Update CHANGELOG
-        run: |
-          chmod +x ./scripts/update-changelog.sh
-          ./scripts/update-changelog.sh "${{ steps.version.outputs.VERSION }}"
-
-      # ===========================================
-      # 5. Bump version in Xcode project
-      # ===========================================
-      - name: Bump version
-        run: |
-          chmod +x ./scripts/bump-version.sh
-          ./scripts/bump-version.sh "${{ steps.version.outputs.VERSION }}"
-
-      # ===========================================
-      # 6. Build
-      # ===========================================
-      - name: Build
-        env:
-          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
-          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
-        run: |
-          chmod +x ./scripts/build.sh
-          ./scripts/build.sh
-
-      # ===========================================
-      # 7. Package (ZIP + DMG)
+      # 4. Build release artifacts
       # ===========================================
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Package
-        run: |
-          chmod +x ./scripts/package.sh
-          ./scripts/package.sh
-
-      # ===========================================
-      # 8. Generate Appcast with Sparkle signing
-      # ===========================================
-      - name: Generate Appcast
+      - name: Build DMG, ZIP, and appcast
         env:
+          POSTHOG_PROJECT_TOKEN: ${{ secrets.POSTHOG_PROJECT_TOKEN }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: |
-          chmod +x ./scripts/generate-appcast-ci.sh
-          ./scripts/generate-appcast-ci.sh
+        run: ./scripts/build_dmg.sh --version "${{ steps.version.outputs.VERSION }}" --generate-appcast
 
       # ===========================================
-      # 9. Create tag (for workflow_dispatch)
+      # 5. Create tag (for workflow_dispatch)
       # ===========================================
       - name: Create tag
         if: github.event_name == 'workflow_dispatch'
@@ -122,7 +86,7 @@ jobs:
           fi
 
       # ===========================================
-      # 10. Create GitHub Release
+      # 6. Create GitHub Release
       # ===========================================
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -148,7 +112,7 @@ jobs:
           prerelease: ${{ steps.version.outputs.IS_PRERELEASE == 'true' }}
 
       # ===========================================
-      # 11. Update latest stable release with merged appcast
+      # 7. Update latest stable release with merged appcast
       # ===========================================
       - name: Update latest stable appcast
         if: steps.version.outputs.IS_PRERELEASE == 'true'
@@ -172,6 +136,9 @@ jobs:
             echo "No stable release found to update"
           fi
 
+      # ===========================================
+      # 8. Commit version changes
+      # ===========================================
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
@@ -229,7 +196,7 @@ jobs:
           fi
 
       # ===========================================
-      # 12. Summary
+      # 9. Summary
       # ===========================================
       - name: Summary
         run: |
@@ -243,7 +210,7 @@ jobs:
           ls -la build/release/ >> $GITHUB_STEP_SUMMARY
 
       # ===========================================
-      # 13. Trigger homebrew-tap update
+      # 10. Trigger homebrew-tap update
       # ===========================================
       - name: Trigger homebrew-tap update
         if: steps.version.outputs.IS_PRERELEASE == 'false'
