@@ -147,6 +147,19 @@ final class MonitorRuntimeTests: XCTestCase {
         XCTAssertFalse(YubiKeySecretVault.isPIVToken("com.apple.pivtokenizer:1234"))
     }
 
+    func testPIVIdentityQueryOnlyReturnsExternalTokenMetadataAndReferences() {
+        let query = YubiKeySecretVault.availableIdentityQuery()
+
+        XCTAssertEqual(query[kSecClass as String] as? String, kSecClassIdentity as String)
+        XCTAssertEqual(query[kSecAttrAccessGroup as String] as? String, kSecAttrAccessGroupToken as String)
+        XCTAssertEqual(query[kSecReturnAttributes as String] as? Bool, true)
+        XCTAssertEqual(query[kSecReturnRef as String] as? Bool, true)
+        XCTAssertNil(query[kSecReturnData as String])
+        XCTAssertTrue(
+            (query[kSecUseAuthenticationContext as String] as? LAContext)?.interactionNotAllowed == true
+        )
+    }
+
     /// The rollback this prevents: with the vault enabled and the key absent or
     /// the PIN prompt dismissed, `CLIProxyManager.init` reads nil, mints a fresh
     /// UUID and saves it — destroying the envelope holding the real management
@@ -200,16 +213,16 @@ final class MonitorRuntimeTests: XCTestCase {
     }
 
     func testExternalCredentialOperationsDoNotAllowAuthenticationUI() {
-        let readQuery = KeychainHelper.externalCredentialQuery(service: "gh:github.com", account: "github.com")
-        let updateQuery = KeychainHelper.externalCredentialUpdateQuery(service: "gh:github.com", account: "github.com")
+        let readQuery = KeychainHelper.externalCredentialQuery(service: "fixture.external", account: "fixture-account")
+        let updateQuery = KeychainHelper.externalCredentialUpdateQuery(service: "fixture.external", account: "fixture-account")
 
-        XCTAssertEqual(readQuery[kSecAttrService as String] as? String, "gh:github.com")
-        XCTAssertEqual(readQuery[kSecAttrAccount as String] as? String, "github.com")
+        XCTAssertEqual(readQuery[kSecAttrService as String] as? String, "fixture.external")
+        XCTAssertEqual(readQuery[kSecAttrAccount as String] as? String, "fixture-account")
         XCTAssertTrue(
             (readQuery[kSecUseAuthenticationContext as String] as? LAContext)?.interactionNotAllowed == true
         )
-        XCTAssertEqual(updateQuery[kSecAttrService as String] as? String, "gh:github.com")
-        XCTAssertEqual(updateQuery[kSecAttrAccount as String] as? String, "github.com")
+        XCTAssertEqual(updateQuery[kSecAttrService as String] as? String, "fixture.external")
+        XCTAssertEqual(updateQuery[kSecAttrAccount as String] as? String, "fixture-account")
         XCTAssertTrue(
             (updateQuery[kSecUseAuthenticationContext as String] as? LAContext)?.interactionNotAllowed == true
         )
