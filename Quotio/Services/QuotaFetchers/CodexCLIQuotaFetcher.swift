@@ -365,7 +365,7 @@ actor CodexCLIQuotaFetcher {
         for (key, quota) in await fetchLegacyQuotas() where results[key] == nil {
             results[key] = quota
         }
-        return results
+        return await promoteFreshLegacyAliases(in: results)
     }
 
     /// Fetches only the credential represented by the canonical account key.
@@ -453,6 +453,62 @@ actor CodexCLIQuotaFetcher {
     func reconcileLegacyAliases(
         in quotas: [String: ProviderQuotaData]
     ) async -> [String: ProviderQuotaData] {
+        Self.reconcileLegacyAliases(
+            in: quotas,
+            legacy: readLegacyIdentities(),
+            current: await currentAccountIdentities()
+        )
+    }
+
+    func promoteFreshLegacyAliases(
+        in quotas: [String: ProviderQuotaData]
+    ) async -> [String: ProviderQuotaData] {
+        Self.promoteFreshLegacyAliases(
+            in: quotas,
+            legacy: readLegacyIdentities(),
+            current: await currentAccountIdentities()
+        )
+    }
+
+    nonisolated static func promoteFreshLegacyAliases(
+        in quotas: [String: ProviderQuotaData],
+        legacy: [CodexQuotaAccountIdentity],
+        current: [CodexQuotaAccountIdentity]
+    ) -> [String: ProviderQuotaData] {
+        var promoted = quotas
+        let uniqueLegacyByAccountID = Dictionary(grouping: legacy.compactMap { identity -> (String, CodexQuotaAccountIdentity)? in
+            guard let accountID = identity.accountID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !accountID.isEmpty else { return nil }
+            return (accountID, identity)
+        }, by: \.0).compactMapValues { entries -> CodexQuotaAccountIdentity? in
+            let identities = entries.map(\.1)
+            guard Set(identities.map(\.key)).count == 1 else { return nil }
+            return identities.first
+        }
+        let currentByKey = Dictionary(grouping: current, by: \.key)
+
+        for (key, quota) in quotas {
+            let identities = currentByKey[key, default: []]
+            let accountIDs = identities.compactMap { identity -> String? in
+                guard let accountID = identity.accountID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !accountID.isEmpty else { return nil }
+                return accountID
+            }
+            let distinctAccountIDs = Set(accountIDs)
+            guard accountIDs.count == identities.count,
+                  distinctAccountIDs.count == 1,
+                  let accountID = distinctAccountIDs.first,
+                  let legacyIdentity = uniqueLegacyByAccountID[accountID],
+                  legacyIdentity.key != key else { continue }
+            if promoted[legacyIdentity.key].map({ $0.lastUpdated <= quota.lastUpdated }) ?? true {
+                promoted[legacyIdentity.key] = quota
+            }
+            promoted.removeValue(forKey: key)
+        }
+        return promoted
+    }
+
+    private func currentAccountIdentities() async -> [CodexQuotaAccountIdentity] {
         var current = readAuthSources().map { source in
             let claims = source.auth.tokens?.idToken.flatMap(decodeJWT)
             return CodexQuotaAccountIdentity(
@@ -482,12 +538,7 @@ actor CodexCLIQuotaFetcher {
                 accountID: credential.accountID ?? claims?.accountId
             ))
         }
-
-        return Self.reconcileLegacyAliases(
-            in: quotas,
-            legacy: readLegacyIdentities(),
-            current: current
-        )
+        return current
     }
 
     nonisolated static func reconcileLegacyAliases(
@@ -519,8 +570,8 @@ actor CodexCLIQuotaFetcher {
                       let currentAccountID = currentIdentity.accountID?.trimmingCharacters(in: .whitespacesAndNewlines),
                       !currentAccountID.isEmpty,
                       matchingCurrent.filter({ $0.key == currentIdentity.key }).allSatisfy({
-                          $0.accountID?.trimmingCharacters(in: .whitespacesAndNewlines) == currentAccountID
-                      }) else { continue }
+                    $0.accountID?.trimmingCharacters(in: .whitespacesAndNewlines) == currentAccountID
+                }) else { continue }
                 for legacyAccount in legacyAccounts where
                     legacyAccount.accountID?.trimmingCharacters(in: .whitespacesAndNewlines) == currentAccountID {
                     guard reconciled[legacyAccount.key].map({ $0.lastUpdated <= freshQuota.lastUpdated }) ?? true else {
