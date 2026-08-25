@@ -89,6 +89,14 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
         case .dark: return "moon.fill"
         }
     }
+
+    var appKitAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
 }
 
 // MARK: - Appearance Settings Manager
@@ -117,14 +125,7 @@ final class AppearanceManager {
     
     /// Apply the current appearance mode to the app
     func applyAppearance() {
-        switch appearanceMode {
-        case .system:
-            NSApp.appearance = nil
-        case .light:
-            NSApp.appearance = NSAppearance(named: .aqua)
-        case .dark:
-            NSApp.appearance = NSAppearance(named: .darkAqua)
-        }
+        NSApp.appearance = appearanceMode.appKitAppearance
     }
 }
 
