@@ -12,7 +12,6 @@
   <img src="https://img.shields.io/badge/platform-macOS-lightgrey.svg?style=flat" alt="Platform macOS" />
   <img src="https://img.shields.io/badge/language-Swift-orange.svg?style=flat" alt="Language Swift" />
   <img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat" alt="License MIT" />
-  <a href="https://discord.gg/dFzeZ7qS"><img src="https://img.shields.io/badge/Discord-Tham%20gia-5865F2.svg?style=flat&logo=discord&logoColor=white" alt="Discord" /></a>
   <a href="README.md"><img src="https://img.shields.io/badge/lang-English-blue.svg?style=flat" alt="English" /></a>
   <a href="README.zh.md"><img src="https://img.shields.io/badge/lang-zh--CN-green.svg?style=flat" alt="Chinese" /></a>
   <a href="README.fr.md"><img src="https://img.shields.io/badge/lang-Français-blue.svg?style=flat" alt="French" /></a>
@@ -193,39 +192,6 @@ Vào tab **Agents** → Chọn agent đã cài → Nhấn **Configure** → Ch�
 3. Commit (`git commit -m 'Thêm tính năng mới'`)
 4. Push (`git push origin feature/tinh-nang-moi`)
 5. Mở Pull Request
-
-## 💬 Cộng đồng
-
-Tham gia cộng đồng Discord để được hỗ trợ, chia sẻ phản hồi và kết nối với người dùng khác:
-
-<a href="https://discord.gg/dFzeZ7qS">
-  <img src="https://img.shields.io/badge/Discord-Tham%20gia%20cộng%20đồng-5865F2.svg?style=for-the-badge&logo=discord&logoColor=white" alt="Tham gia Discord" />
-</a>
-
-## ⭐ Star History
-
-<picture>
-  <source
-    media="(prefers-color-scheme: dark)"
-    srcset="
-      https://api.star-history.com/svg?repos=nguyenphutrong/quotio&type=Date&theme=dark
-    "
-  />
-  <source
-    media="(prefers-color-scheme: light)"
-    srcset="
-      https://api.star-history.com/svg?repos=nguyenphutrong/quotio&type=Date
-    "
-  />
-  <img
-    alt="Star History Chart"
-    src="https://api.star-history.com/svg?repos=nguyenphutrong/quotio&type=Date"
-  />
-</picture>
-
-## 📊 Hoạt động Repo
-
-![Repo Activity](https://repobeats.axiom.co/api/embed/884e7349c8939bfd4bdba4bc582b6fdc0ecc21ee.svg "Repobeats analytics image")
 
 ## 💖 Người đóng góp
 
