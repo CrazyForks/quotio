@@ -51,8 +51,28 @@ final class ProxyStartupHealthPollerTests: XCTestCase {
         )
 
         XCTAssertEqual(outcome, .processExited)
+        XCTAssertEqual(processChecks, 2)
         XCTAssertEqual(healthChecks, 1)
-        XCTAssertEqual(sleeps, 1)
+        XCTAssertEqual(sleeps, 0)
+    }
+
+    func testReportsProcessExitDuringFinalHealthCheck() async throws {
+        let poller = ProxyStartupHealthPoller(timeoutNanoseconds: 100, retryDelayNanoseconds: 25)
+        var isProcessRunning = true
+        var currentTime: UInt64 = 0
+
+        let outcome = try await poller.waitUntilReady(
+            isProcessRunning: { isProcessRunning },
+            checkHealth: {
+                isProcessRunning = false
+                currentTime = 100
+                return false
+            },
+            sleep: { _ in XCTFail("An exited process must not sleep") },
+            now: { currentTime }
+        )
+
+        XCTAssertEqual(outcome, .processExited)
     }
 
     func testTimesOutAtDeadlineAndTruncatesFinalSleep() async throws {
@@ -90,6 +110,33 @@ final class ProxyStartupHealthPollerTests: XCTestCase {
                 sleep: { _ in throw CancellationError() },
                 now: { 0 }
             )
+            XCTFail("Expected cancellation to propagate")
+        } catch is CancellationError {
+            // Expected: CLIProxyManager's existing defer cleanup handles it.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
+    func testCancellationDuringFinalHealthCheckPropagates() async {
+        let poller = ProxyStartupHealthPoller(timeoutNanoseconds: 100, retryDelayNanoseconds: 25)
+        var currentTime: UInt64 = 0
+
+        let task = Task { @MainActor in
+            try await poller.waitUntilReady(
+                isProcessRunning: { true },
+                checkHealth: {
+                    withUnsafeCurrentTask { $0?.cancel() }
+                    currentTime = 100
+                    return false
+                },
+                sleep: { _ in XCTFail("A cancelled task must not sleep") },
+                now: { currentTime }
+            )
+        }
+
+        do {
+            _ = try await task.value
             XCTFail("Expected cancellation to propagate")
         } catch is CancellationError {
             // Expected: CLIProxyManager's existing defer cleanup handles it.

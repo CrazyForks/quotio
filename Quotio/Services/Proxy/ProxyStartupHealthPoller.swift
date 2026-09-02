@@ -55,6 +55,12 @@ struct ProxyStartupHealthPoller {
                 return .ready
             }
 
+            try Task.checkCancellation()
+
+            guard isProcessRunning() else {
+                return .processExited
+            }
+
             let currentTime = now()
             guard currentTime < deadline else {
                 return .timedOut
