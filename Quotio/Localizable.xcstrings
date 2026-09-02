@@ -13425,6 +13425,64 @@
         }
       }
     },
+    "proxy.upgrade.error.startupTimedOut" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test proxy did not start within the allowed time."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le proxy de test n’a pas démarré dans le délai imparti."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy thử nghiệm không khởi động trong thời gian cho phép."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试代理未能在规定时间内启动。"
+          }
+        }
+      }
+    },
+    "proxy.upgrade.error.testProcessExited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The test proxy stopped before it was ready."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le proxy de test s’est arrêté avant d’être prêt."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proxy thử nghiệm đã dừng trước khi sẵn sàng."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试代理在准备就绪前已停止。"
+          }
+        }
+      }
+    },
     "quota.accounts" : {
       "extractionState" : "stale",
       "localizations" : {

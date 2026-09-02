@@ -1753,9 +1753,13 @@ extension CLIProxyManager {
         case .ready:
             break
         case .processExited:
-            throw ProxyUpgradeError.dryRunFailed("Test proxy exited before becoming healthy")
+            throw ProxyUpgradeError.dryRunFailed(
+                "proxy.upgrade.error.testProcessExited".localizedStatic()
+            )
         case .timedOut:
-            throw ProxyUpgradeError.dryRunFailed("Test proxy did not become healthy before startup timeout")
+            throw ProxyUpgradeError.dryRunFailed(
+                "proxy.upgrade.error.startupTimedOut".localizedStatic()
+            )
         }
         
         // Mark success - defer block will not cleanup
