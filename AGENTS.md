@@ -48,8 +48,9 @@ unnecessary.
 
 ## Build, Test, and Run
 
-Run commands from the repository root. These commands have been executed successfully
-in this repository.
+Run commands from the repository root. Choose the check that exercises the changed
+behavior; the command list is a reference, not a checklist for every task. Report
+results from the current checkout rather than assuming a previous run still applies.
 
 Build the Debug app:
 
@@ -57,14 +58,15 @@ Build the Debug app:
 xcodebuild -project Quotio.xcodeproj -scheme Quotio -configuration Debug -destination 'platform=macOS' build
 ```
 
-Run all package tests and architecture checks:
+For package-wide changes, run all package tests. Run architecture checks when module
+boundaries, imports, or dependency composition change:
 
 ```bash
 swift test --package-path Packages/QuotioCore
 ./scripts/check_architecture.sh
 ```
 
-Run the complete unit-test target:
+For executable-wide changes, run the complete integration-test target:
 
 ```bash
 xcodebuild -project Quotio.xcodeproj -scheme Quotio -configuration Debug -destination 'platform=macOS' test
@@ -129,7 +131,12 @@ the repository root is not a Swift package.
 - Use `async`, `throws`, and `@MainActor` where the production contract requires them.
   Prefer temporary directories and injected dependencies over real user configuration.
 - For a bug fix, reproduce the failure with a focused regression test when practical,
-  then run the owning package tests and the full Xcode test target.
+  then run the affected test or owning package target. Broaden to package-wide tests
+  when shared contracts change, and run the relevant Xcode integration tests when
+  executable composition, lifecycle, identity, or bundling is affected.
+- Documentation-only changes need checks of referenced paths, commands, and the diff;
+  they do not require an app build, test suite, or relaunch. Do not use
+  `build_and_run.sh --verify` as a substitute for inspecting UI or affected behavior.
 - There is no UI-test target. For UI work, launch the app and inspect light and dark
   appearances. For provider, OAuth, proxy, tunnel, or menu bar work, manually exercise
   the affected flow in addition to unit tests.
@@ -173,8 +180,10 @@ the repository root is not a Swift package.
 - `.github/workflows/ci.yml` runs package tests, architecture checks, Xcode tests, and a
   Debug build. `.github/workflows/release.yml` handles `v*` tags and manual dispatch to
   build release artifacts, optionally sign/notarize them, publish the GitHub release and
-  appcast, and dispatch the Homebrew tap update. Local build and test results are still
-  required before review.
+  appcast, and dispatch the Homebrew tap update. Before review, report the relevant
+  local checks from the Testing section and any checks that could not run.
+- Keep the currently checked-out branch unless the user explicitly requests another.
+  Do not switch to `main` or `master` merely to commit audit findings.
 - Keep commits atomic and limited to one logical change.
 - Follow the repository's Conventional Commit history, for example `fix(proxy): ...`,
   `feat(settings): ...`, `test: ...`, or `docs: ...`. Mark breaking changes explicitly.
