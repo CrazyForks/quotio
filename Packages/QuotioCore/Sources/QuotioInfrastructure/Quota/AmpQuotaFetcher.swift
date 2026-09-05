@@ -198,6 +198,25 @@ public actor AmpQuotaFetcher: QuotaFetching {
         QuotaMetric(name: "amp-free", percentage: remaining, resetTime: nextMidnight(after: now)))
     }
     if let match = captures(
+      #"(?im)^\s*Amp\s+([^:\r\n]+?)\s+Subscription:\s*agent usage\s+\$([\d,]+(?:\.\d+)?)\s+of\s+\$([\d,]+(?:\.\d+)?)\s+remaining\s+\([\d.]+%\),\s*orb usage\s+([\d,]+(?:\.\d+)?)h\s+of\s+([\d,]+(?:\.\d+)?)h\b"#,
+      text),
+      let agentRemaining = dollars(match[1]), let agentLimit = dollars(match[2]),
+      let orbRemaining = dollars(match[3]), let orbLimit = dollars(match[4]),
+      [agentRemaining, agentLimit, orbRemaining, orbLimit].allSatisfy(\.isFinite),
+      agentLimit > 0, orbLimit > 0,
+      (0...agentLimit).contains(agentRemaining), (0...orbLimit).contains(orbRemaining)
+    {
+      plan = match[0]
+      // Date-only billing periods do not establish an exact reset timestamp.
+      metrics.insert(
+        QuotaMetric(
+          name: "amp-agent-usage", percentage: agentRemaining / agentLimit * 100, resetTime: "",
+          presentation: .progress(used: agentLimit - agentRemaining, limit: agentLimit, unit: .usd)),
+        at: 0)
+      metrics.insert(
+        QuotaMetric(name: "amp-orb-usage", percentage: orbRemaining / orbLimit * 100, resetTime: ""),
+        at: 1)
+    } else if let match = captures(
       #"(?im)^\s*Amp\s+([^:\r\n]+?)\s+Subscription:\s*([\d.]+)%\s+(?:other|agent)\s+usage\s+and\s+([\d.]+)%\s+orb\s+usage\s+remaining\b(?:\s*-\s*resets\s+upon\s+renewal\s+in\s+(\d+)\s+(minutes?|hours?|days?|weeks?|months?|years?))?"#,
       text),
       let agent = percentage(match[1]), let orb = percentage(match[2])

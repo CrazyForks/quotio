@@ -234,6 +234,28 @@ final class OpenRouterAmpQuotaFetcherTests: XCTestCase {
       .amount(value: 21.57, unit: .usd, semantics: .balance))
   }
 
+  func testAmpMapsCurrentAmountBasedAPIResponse() throws {
+    let text = """
+      Signed in as person@example.com (example)
+      Amp Free: 75% remaining today (resets daily)
+      Amp Megawatt Subscription: agent usage $12 of $20 remaining (60%), orb usage 500.5h of 750h a1.small orb hours remaining (67%) - period 2026-01-01 to 2026-02-01, resets upon renewal in 13 days
+      Individual credits: $12.50 remaining
+      Workspace Example: $0 remaining
+      """
+    let quota = try XCTUnwrap(AmpQuotaFetcher.parse(text, now: Date(timeIntervalSince1970: 1_700_000_000)))
+    let agent = try XCTUnwrap(quota.models.first { $0.name == "amp-agent-usage" })
+    let orb = try XCTUnwrap(quota.models.first { $0.name == "amp-orb-usage" })
+    XCTAssertEqual(quota.planType, "Megawatt")
+    XCTAssertEqual(quota.models.count, 5)
+    XCTAssertEqual(agent.percentage, 60)
+    XCTAssertEqual(agent.presentation, .progress(used: 8, limit: 20, unit: .usd))
+    XCTAssertEqual(orb.percentage, 500.5 / 750 * 100, accuracy: 0.0001)
+    XCTAssertEqual(agent.resetTime, "")
+    XCTAssertEqual(orb.resetTime, "")
+    XCTAssertEqual(quota.models.first { $0.name.hasPrefix("amp-workspace-") }?.presentation,
+                   .amount(value: 0, unit: .usd, semantics: .balance))
+  }
+
   func testAmpUsesIdentityPlanWhenSubscriptionIsMissing() throws {
     let quota = try XCTUnwrap(AmpQuotaFetcher.parse(
       """
